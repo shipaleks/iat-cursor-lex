@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { Box, Container, CircularProgress } from '@mui/material';
-import { Routes, Route, Navigate, useNavigate, BrowserRouter as Router } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { NicknameForm } from './components/auth/NicknameForm';
 import { Instructions } from './components/auth/Instructions';
@@ -13,8 +13,6 @@ import { signInAnonymousUser, getParticipantProgress } from './firebase/service'
 import { auth } from './firebase/config';
 import { User } from 'firebase/auth';
 import { MOCK_IMAGES } from './components/trial/ExperimentScreen';
-import { useTelegram } from './hooks/useTelegram';
-import './App.css';
 
 const theme = createTheme({
   palette: {
@@ -25,7 +23,7 @@ const theme = createTheme({
   }
 });
 
-const AppContent = () => {
+const App = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +31,6 @@ const AppContent = () => {
   const [experimentStats, setExperimentStats] = useState<ExperimentStats | null>(null);
   const [canContinue, setCanContinue] = useState(false);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
-  const { tg, isTelegram } = useTelegram();
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -53,15 +50,9 @@ const AppContent = () => {
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (isTelegram) {
-      tg.ready();
-      document.documentElement.className = tg.colorScheme;
-    }
-  }, [tg, isTelegram]);
-
   const handleNicknameSubmit = (nickname: string, isTestSession: boolean, existingUserId?: string) => {
     if (user) {
+      // Если передан existingUserId, используем его вместо текущего ID
       const participantId = existingUserId || user.uid;
       
       setParticipant({
@@ -71,6 +62,7 @@ const AppContent = () => {
         isTestSession
       });
 
+      // Если это существующий пользователь, обновляем текущего пользователя
       if (existingUserId) {
         setUser(prev => prev ? { ...prev, uid: existingUserId } : null);
       }
@@ -81,6 +73,7 @@ const AppContent = () => {
     setExperimentStats(stats);
     setShowCompletionScreen(true);
     
+    // Проверяем, может ли участник продолжить
     if (user && !participant?.isTestSession) {
       const progress = await getParticipantProgress(user.uid);
       if (progress) {
@@ -95,6 +88,7 @@ const AppContent = () => {
   const handleStartNewSession = () => {
     if (participant) {
       setShowCompletionScreen(false);
+      // Создаем новую сессию с новым ID, сохраняя остальные параметры
       setParticipant({
         ...participant,
         sessionId: crypto.randomUUID()
@@ -113,102 +107,92 @@ const AppContent = () => {
   }
 
   return (
-    <Box
-      width="100vw"
-      height="100vh"
-      bgcolor="background.default"
-      display="flex"
-      alignItems="stretch"
-      sx={{
-        py: { xs: 0, sm: 2 }
-      }}
-    >
-      {(!participant || showCompletionScreen) && <DataExport />}
-      <Container
-        disableGutters
-        sx={{
-          height: '100%',
-          maxWidth: { xs: '100%', sm: 600 },
-          mx: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          bgcolor: 'background.paper',
-          borderRadius: { xs: 0, sm: 2 },
-          boxShadow: { xs: 0, sm: 3 },
-          overflow: 'auto'
-        }}
-      >
-        <Routes>
-          <Route
-            path="/"
-            element={
-              user && !participant ? (
-                <NicknameForm onSubmit={handleNicknameSubmit} />
-              ) : (
-                <Navigate to="/instructions" replace />
-              )
-            }
-          />
-          <Route
-            path="/instructions"
-            element={
-              participant ? (
-                <Instructions onStart={() => {
-                  console.log('Starting experiment for participant:', participant.nickname);
-                  setShowCompletionScreen(false);
-                  navigate('/experiment');
-                }} />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            }
-          />
-          <Route
-            path="/experiment"
-            element={
-              participant ? (
-                <ExperimentScreen
-                  participant={participant}
-                  onComplete={handleExperimentComplete}
-                />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            }
-          />
-          <Route
-            path="/completion"
-            element={
-              showCompletionScreen && experimentStats ? (
-                <CompletionScreen
-                  participant={participant!}
-                  sessionStats={{
-                    totalTrials: experimentStats.total,
-                    correctTrials: experimentStats.correct
-                  }}
-                  canContinue={canContinue}
-                  onStartNewSession={handleStartNewSession}
-                />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            }
-          />
-        </Routes>
-      </Container>
-    </Box>
-  );
-};
-
-const App = () => {
-  return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <div className="App">
-          <AppContent />
-        </div>
-      </Router>
+      <Box
+        width="100vw"
+        height="100vh"
+        bgcolor="background.default"
+        display="flex"
+        alignItems="stretch"
+        sx={{
+          py: { xs: 0, sm: 2 }
+        }}
+      >
+        {(!participant || showCompletionScreen) && <DataExport />}
+        <Container
+          disableGutters
+          sx={{
+            height: '100%',
+            maxWidth: { xs: '100%', sm: 600 },
+            mx: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            bgcolor: 'background.paper',
+            borderRadius: { xs: 0, sm: 2 },
+            boxShadow: { xs: 0, sm: 3 },
+            overflow: 'auto'
+          }}
+        >
+          <Routes>
+            <Route
+              path="/"
+              element={
+                user && !participant ? (
+                  <NicknameForm onSubmit={handleNicknameSubmit} />
+                ) : (
+                  <Navigate to="/instructions" replace />
+                )
+              }
+            />
+            <Route
+              path="/instructions"
+              element={
+                participant ? (
+                  <Instructions onStart={() => {
+                    console.log('Starting experiment for participant:', participant.nickname);
+                    setShowCompletionScreen(false);
+                    navigate('/experiment');
+                  }} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/experiment"
+              element={
+                participant ? (
+                  <ExperimentScreen
+                    participant={participant}
+                    onComplete={handleExperimentComplete}
+                  />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/completion"
+              element={
+                showCompletionScreen && experimentStats ? (
+                  <CompletionScreen
+                    participant={participant!}
+                    sessionStats={{
+                      totalTrials: experimentStats.total,
+                      correctTrials: experimentStats.correct
+                    }}
+                    canContinue={canContinue}
+                    onStartNewSession={handleStartNewSession}
+                  />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+          </Routes>
+        </Container>
+      </Box>
     </ThemeProvider>
   );
 };
