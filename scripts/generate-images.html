@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate SVG Images</title>
+</head>
+<body>
+    <div id="container"></div>
+    <script>
+        const images = [
+            { name: 'circle1.svg', draw: (ctx) => ctx.arc(200, 200, 150, 0, 2 * Math.PI) },
+            { name: 'square1.svg', draw: (ctx) => ctx.rect(50, 50, 300, 300) },
+            { name: 'triangle1.svg', draw: (ctx) => {
+                ctx.moveTo(200, 50);
+                ctx.lineTo(350, 350);
+                ctx.lineTo(50, 350);
+                ctx.closePath();
+            }},
+            { name: 'star1.svg', draw: (ctx) => {
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * 4 * Math.PI) / 5;
+                    const x = 200 + 150 * Math.cos(angle);
+                    const y = 200 + 150 * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+            }},
+            { name: 'spiral1.svg', draw: (ctx) => {
+                let angle = 0;
+                let radius = 0;
+                ctx.moveTo(200, 200);
+                while (radius < 150) {
+                    angle += 0.2;
+                    radius = angle * 10;
+                    const x = 200 + radius * Math.cos(angle);
+                    const y = 200 + radius * Math.sin(angle);
+                    ctx.lineTo(x, y);
+                }
+            }},
+            { name: 'hexagon1.svg', draw: (ctx) => {
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i * 2 * Math.PI) / 6;
+                    const x = 200 + 150 * Math.cos(angle);
+                    const y = 200 + 150 * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+            }},
+            { name: 'oval1.svg', draw: (ctx) => {
+                ctx.ellipse(200, 200, 180, 120, 0, 0, 2 * Math.PI);
+            }},
+            { name: 'rhombus1.svg', draw: (ctx) => {
+                ctx.moveTo(200, 50);
+                ctx.lineTo(350, 200);
+                ctx.lineTo(200, 350);
+                ctx.lineTo(50, 200);
+                ctx.closePath();
+            }},
+            { name: 'cross1.svg', draw: (ctx) => {
+                ctx.moveTo(125, 50);
+                ctx.lineTo(275, 50);
+                ctx.lineTo(275, 125);
+                ctx.lineTo(350, 125);
+                ctx.lineTo(350, 275);
+                ctx.lineTo(275, 275);
+                ctx.lineTo(275, 350);
+                ctx.lineTo(125, 350);
+                ctx.lineTo(125, 275);
+                ctx.lineTo(50, 275);
+                ctx.lineTo(50, 125);
+                ctx.lineTo(125, 125);
+                ctx.closePath();
+            }},
+            { name: 'arrow1.svg', draw: (ctx) => {
+                ctx.moveTo(50, 200);
+                ctx.lineTo(300, 200);
+                ctx.lineTo(300, 100);
+                ctx.lineTo(400, 200);
+                ctx.lineTo(300, 300);
+                ctx.lineTo(300, 200);
+                ctx.closePath();
+            }},
+            // 3D варианты
+            { name: 'circle2.svg', draw: (ctx) => {
+                ctx.ellipse(200, 200, 150, 150, 0, 0, 2 * Math.PI);
+                ctx.moveTo(320, 140);
+                ctx.ellipse(200, 140, 120, 60, 0, 0, 2 * Math.PI);
+            }},
+            { name: 'square2.svg', draw: (ctx) => {
+                // Передняя грань
+                ctx.moveTo(100, 100);
+                ctx.lineTo(300, 100);
+                ctx.lineTo(300, 300);
+                ctx.lineTo(100, 300);
+                ctx.closePath();
+                // Задняя грань
+                ctx.moveTo(150, 50);
+                ctx.lineTo(350, 50);
+                ctx.lineTo(350, 250);
+                ctx.lineTo(300, 300);
+                ctx.moveTo(300, 100);
+                ctx.lineTo(350, 50);
+            }},
+            { name: 'triangle2.svg', draw: (ctx) => {
+                // Передняя грань
+                ctx.moveTo(200, 50);
+                ctx.lineTo(350, 350);
+                ctx.lineTo(50, 350);
+                ctx.closePath();
+                // Боковые линии
+                ctx.moveTo(200, 50);
+                ctx.lineTo(250, 25);
+                ctx.lineTo(400, 325);
+                ctx.lineTo(350, 350);
+            }},
+            { name: 'star2.svg', draw: (ctx) => {
+                // Передняя звезда
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * 4 * Math.PI) / 5;
+                    const x = 200 + 150 * Math.cos(angle);
+                    const y = 200 + 150 * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                // Задняя звезда (смещенная)
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * 4 * Math.PI) / 5;
+                    const x = 230 + 150 * Math.cos(angle);
+                    const y = 170 + 150 * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+            }},
+            { name: 'spiral2.svg', draw: (ctx) => {
+                // Основная спираль
+                let angle = 0;
+                let radius = 0;
+                ctx.moveTo(200, 200);
+                while (radius < 150) {
+                    angle += 0.2;
+                    radius = angle * 10;
+                    const x = 200 + radius * Math.cos(angle);
+                    const y = 200 + radius * Math.sin(angle);
+                    ctx.lineTo(x, y);
+                }
+                // Вторая спираль (для объема)
+                angle = 0;
+                radius = 0;
+                ctx.moveTo(220, 180);
+                while (radius < 150) {
+                    angle += 0.2;
+                    radius = angle * 10;
+                    const x = 220 + radius * Math.cos(angle);
+                    const y = 180 + radius * Math.sin(angle);
+                    ctx.lineTo(x, y);
+                }
+            }},
+            { name: 'hexagon2.svg', draw: (ctx) => {
+                // Передняя грань
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i * 2 * Math.PI) / 6;
+                    const x = 200 + 150 * Math.cos(angle);
+                    const y = 200 + 150 * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                // Задняя грань
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i * 2 * Math.PI) / 6;
+                    const x = 230 + 150 * Math.cos(angle);
+                    const y = 170 + 150 * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+            }},
+            { name: 'oval2.svg', draw: (ctx) => {
+                ctx.ellipse(200, 200, 180, 120, 0, 0, 2 * Math.PI);
+                ctx.moveTo(350, 140);
+                ctx.ellipse(200, 140, 150, 60, 0, 0, 2 * Math.PI);
+            }},
+            { name: 'rhombus2.svg', draw: (ctx) => {
+                // Передняя грань
+                ctx.moveTo(200, 50);
+                ctx.lineTo(350, 200);
+                ctx.lineTo(200, 350);
+                ctx.lineTo(50, 200);
+                ctx.closePath();
+                // Задняя грань
+                ctx.moveTo(230, 25);
+                ctx.lineTo(380, 175);
+                ctx.lineTo(350, 200);
+                ctx.moveTo(200, 50);
+                ctx.lineTo(230, 25);
+            }},
+            { name: 'cross2.svg', draw: (ctx) => {
+                // Передний крест
+                ctx.moveTo(125, 50);
+                ctx.lineTo(275, 50);
+                ctx.lineTo(275, 125);
+                ctx.lineTo(350, 125);
+                ctx.lineTo(350, 275);
+                ctx.lineTo(275, 275);
+                ctx.lineTo(275, 350);
+                ctx.lineTo(125, 350);
+                ctx.lineTo(125, 275);
+                ctx.lineTo(50, 275);
+                ctx.lineTo(50, 125);
+                ctx.lineTo(125, 125);
+                ctx.closePath();
+                // Объемные элементы
+                ctx.moveTo(125, 50);
+                ctx.lineTo(155, 25);
+                ctx.lineTo(305, 25);
+                ctx.lineTo(275, 50);
+            }},
+            { name: 'arrow2.svg', draw: (ctx) => {
+                // Передняя стрелка
+                ctx.moveTo(50, 200);
+                ctx.lineTo(300, 200);
+                ctx.lineTo(300, 100);
+                ctx.lineTo(400, 200);
+                ctx.lineTo(300, 300);
+                ctx.lineTo(300, 200);
+                ctx.closePath();
+                // Объемные элементы
+                ctx.moveTo(50, 200);
+                ctx.lineTo(80, 170);
+                ctx.lineTo(330, 170);
+                ctx.lineTo(300, 200);
+            }}
+        ];
+
+        const container = document.getElementById('container');
+
+        images.forEach(image => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 400;
+            const ctx = canvas.getContext('2d');
+            
+            // Очищаем канвас
+            ctx.clearRect(0, 0, 400, 400);
+            
+            // Настраиваем стиль
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = 'none';
+            
+            // Начинаем новый путь
+            ctx.beginPath();
+            
+            // Рисуем фигуру
+            image.draw(ctx);
+            
+            // Отрисовываем
+            ctx.stroke();
+            
+            // Конвертируем в SVG
+            const svg = `
+            <svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+                <path d="${ctx.getSerializedPath()}" stroke="black" stroke-width="2" fill="none"/>
+            </svg>`;
+            
+            // Создаем ссылку для скачивания
+            const link = document.createElement('a');
+            link.download = image.name;
+            link.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+            link.innerHTML = `Download ${image.name}`;
+            link.style.display = 'block';
+            link.style.margin = '10px';
+            
+            container.appendChild(link);
+        });
+    </script>
+</body>
+</html> 
