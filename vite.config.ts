@@ -10,6 +10,10 @@ export default defineConfig({
   },
   preview: {
     host: true,
-    port: Number(process.env.PORT) || 3000
+    port: Number(process.env.PORT) || 3000,
+    allowedHosts: [
+      'iat-cursor-lex-production.up.railway.app',
+      '.railway.app'
+    ]
   }
 })
