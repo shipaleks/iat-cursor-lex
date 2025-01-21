@@ -349,15 +349,16 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   return (
     <Box
       sx={{
-        height: '100%',
+        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative'
       }}
     >
+      {/* Прогресс бар */}
       <Box
         sx={{
-          p: { xs: 0.5, sm: 2 },
+          p: 1,
           borderBottom: 1,
           borderColor: 'divider',
           bgcolor: 'background.paper'
@@ -377,14 +378,13 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         </Box>
       </Box>
 
+      {/* Основной контент */}
       <Box
         sx={{
           flex: 1,
           display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
           alignItems: 'center',
-          position: 'relative'
+          justifyContent: 'center'
         }}
       >
         {showFixation ? (
@@ -394,38 +394,42 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         ) : trialState.showImage ? (
           <ImageDisplay imageUrl={trialState.currentImage.url} />
         ) : (
-          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-            <Typography variant="h6" sx={{ fontSize: { xs: '24px', sm: '28px' } }}>
-              {trialState.currentWord.word}
-            </Typography>
-          </Box>
+          <Typography variant="h6" sx={{ fontSize: { xs: '24px', sm: '28px' } }}>
+            {trialState.currentWord.word}
+          </Typography>
         )}
       </Box>
 
+      {/* Кнопки */}
       <Box
         sx={{
-          p: { xs: 0.5, sm: 2 },
           borderTop: 1,
           borderColor: 'divider',
           bgcolor: 'background.paper',
           display: 'flex',
-          gap: 1
+          gap: 1,
+          p: 1
         }}
       >
         <Button
           variant="outlined"
           fullWidth
-          size={isMobile ? "small" : "medium"}
           startIcon={<KeyboardArrowLeft />}
           onClick={() => handleResponse(true)}
           sx={{
+            height: { xs: 56, sm: 'auto' },
             color: lastResponse === 'correct' ? 'success.main' : 
                   lastResponse === 'incorrect' ? 'error.main' : 'inherit',
             borderColor: lastResponse === 'correct' ? 'success.main' : 
                         lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            transition: 'none',
             '&:hover': {
               borderColor: lastResponse === 'correct' ? 'success.main' : 
                           lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+              transition: 'none'
+            },
+            '& .MuiTouchRipple-root': {
+              display: 'none'
             }
           }}
         >
@@ -434,17 +438,22 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         <Button
           variant="outlined"
           fullWidth
-          size={isMobile ? "small" : "medium"}
           endIcon={<KeyboardArrowRight />}
           onClick={() => handleResponse(false)}
           sx={{
+            height: { xs: 56, sm: 'auto' },
             color: lastResponse === 'correct' ? 'success.main' : 
                   lastResponse === 'incorrect' ? 'error.main' : 'inherit',
             borderColor: lastResponse === 'correct' ? 'success.main' : 
                         lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            transition: 'none',
             '&:hover': {
               borderColor: lastResponse === 'correct' ? 'success.main' : 
                           lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+              transition: 'none'
+            },
+            '& .MuiTouchRipple-root': {
+              display: 'none'
             }
           }}
         >

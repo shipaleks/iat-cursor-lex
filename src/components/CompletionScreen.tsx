@@ -1,7 +1,9 @@
 import React from 'react';
-import { Box, Typography, Button, LinearProgress } from '@mui/material';
+import { Box, Typography, Button, LinearProgress, IconButton, Tooltip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { Participant } from '../types';
+import { Leaderboard } from './leaderboard/Leaderboard';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 interface CompletionScreenProps {
   participant: Participant;
@@ -25,18 +27,18 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({
   return (
     <Box
       sx={{
-        p: { xs: 2, sm: 3 },
         height: '100%',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        overflow: 'auto'
       }}
     >
-      <Typography variant="h5" align="center" gutterBottom sx={{ mb: { xs: 2, sm: 3 } }}>
-        Результаты
-      </Typography>
+      <Box sx={{ p: { xs: 2, sm: 3 } }}>
+        <Typography variant="h5" align="center" gutterBottom>
+          Результаты
+        </Typography>
 
-      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 3 } }}>
-        <Box>
+        <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
             Точность ответов:
           </Typography>
@@ -57,18 +59,38 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({
           </Typography>
         </Box>
 
+        {!participant.isTestSession && (
+          <>
+            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography variant="body1" color="text.secondary">
+                Рейтинг (0-100)
+              </Typography>
+              <Tooltip title="Рейтинг учитывает точность ответов и скорость выполнения. Точность выше 90% даёт значительный бонус." arrow>
+                <IconButton size="small">
+                  <HelpOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+
+            <Leaderboard currentUserNickname={participant.nickname} />
+          </>
+        )}
+
         {!canContinue && !participant.isTestSession && (
-          <Typography sx={{ color: 'success.main' }}>
+          <Typography sx={{ mt: 2, color: 'success.main' }}>
             Поздравляем! Вы прошли все изображения. Теперь можно начать новый круг с теми же изображениями.
           </Typography>
         )}
       </Box>
 
       <Box sx={{ 
-        display: 'flex', 
+        p: { xs: 2, sm: 3 },
+        mt: 'auto',
+        borderTop: 1,
+        borderColor: 'divider',
+        display: 'flex',
         flexDirection: 'column',
-        gap: 1,
-        mt: { xs: 2, sm: 3 }
+        gap: 1
       }}>
         {canContinue && (
           <Button
