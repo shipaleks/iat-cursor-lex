@@ -18,6 +18,7 @@
     "@firebase/storage": "^0.13.5",
     "@mui/icons-material": "^6.4.0",
     "@mui/material": "^6.4.0",
+    "@twa-dev/sdk": "^8.0.1",
     "@types/papaparse": "^5.3.15",
     "canvas": "^3.0.1",
     "firebase": "^11.2.0",

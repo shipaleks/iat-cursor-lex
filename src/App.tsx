@@ -13,6 +13,9 @@ import { signInAnonymousUser, getParticipantProgress } from './firebase/service'
 import { auth } from './firebase/config';
 import { User } from 'firebase/auth';
 import { MOCK_IMAGES } from './components/trial/ExperimentScreen';
+import { BrowserRouter as Router } from 'react-router-dom';
+import { useTelegram } from './hooks/useTelegram';
+import './App.css';
 
 const theme = createTheme({
   palette: {
@@ -31,6 +34,7 @@ const App = () => {
   const [experimentStats, setExperimentStats] = useState<ExperimentStats | null>(null);
   const [canContinue, setCanContinue] = useState(false);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
+  const { tg } = useTelegram();
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -49,6 +53,12 @@ const App = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    tg.ready();
+    // Настраиваем тему в соответствии с темой Telegram
+    document.documentElement.className = tg.colorScheme;
+  }, [tg]);
 
   const handleNicknameSubmit = (nickname: string, isTestSession: boolean, existingUserId?: string) => {
     if (user) {
@@ -109,90 +119,94 @@ const App = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box
-        width="100vw"
-        height="100vh"
-        bgcolor="background.default"
-        display="flex"
-        alignItems="stretch"
-        sx={{
-          py: { xs: 0, sm: 2 }
-        }}
-      >
-        {(!participant || showCompletionScreen) && <DataExport />}
-        <Container
-          disableGutters
-          sx={{
-            height: '100%',
-            maxWidth: { xs: '100%', sm: 600 },
-            mx: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: 'background.paper',
-            borderRadius: { xs: 0, sm: 2 },
-            boxShadow: { xs: 0, sm: 3 },
-            overflow: 'auto'
-          }}
-        >
-          <Routes>
-            <Route
-              path="/"
-              element={
-                user && !participant ? (
-                  <NicknameForm onSubmit={handleNicknameSubmit} />
-                ) : (
-                  <Navigate to="/instructions" replace />
-                )
-              }
-            />
-            <Route
-              path="/instructions"
-              element={
-                participant ? (
-                  <Instructions onStart={() => {
-                    console.log('Starting experiment for participant:', participant.nickname);
-                    setShowCompletionScreen(false);
-                    navigate('/experiment');
-                  }} />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/experiment"
-              element={
-                participant ? (
-                  <ExperimentScreen
-                    participant={participant}
-                    onComplete={handleExperimentComplete}
-                  />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/completion"
-              element={
-                showCompletionScreen && experimentStats ? (
-                  <CompletionScreen
-                    participant={participant!}
-                    sessionStats={{
-                      totalTrials: experimentStats.total,
-                      correctTrials: experimentStats.correct
-                    }}
-                    canContinue={canContinue}
-                    onStartNewSession={handleStartNewSession}
-                  />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-          </Routes>
-        </Container>
-      </Box>
+      <Router>
+        <div className="App">
+          <Box
+            width="100vw"
+            height="100vh"
+            bgcolor="background.default"
+            display="flex"
+            alignItems="stretch"
+            sx={{
+              py: { xs: 0, sm: 2 }
+            }}
+          >
+            {(!participant || showCompletionScreen) && <DataExport />}
+            <Container
+              disableGutters
+              sx={{
+                height: '100%',
+                maxWidth: { xs: '100%', sm: 600 },
+                mx: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                bgcolor: 'background.paper',
+                borderRadius: { xs: 0, sm: 2 },
+                boxShadow: { xs: 0, sm: 3 },
+                overflow: 'auto'
+              }}
+            >
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    user && !participant ? (
+                      <NicknameForm onSubmit={handleNicknameSubmit} />
+                    ) : (
+                      <Navigate to="/instructions" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/instructions"
+                  element={
+                    participant ? (
+                      <Instructions onStart={() => {
+                        console.log('Starting experiment for participant:', participant.nickname);
+                        setShowCompletionScreen(false);
+                        navigate('/experiment');
+                      }} />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/experiment"
+                  element={
+                    participant ? (
+                      <ExperimentScreen
+                        participant={participant}
+                        onComplete={handleExperimentComplete}
+                      />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/completion"
+                  element={
+                    showCompletionScreen && experimentStats ? (
+                      <CompletionScreen
+                        participant={participant!}
+                        sessionStats={{
+                          totalTrials: experimentStats.total,
+                          correctTrials: experimentStats.correct
+                        }}
+                        canContinue={canContinue}
+                        onStartNewSession={handleStartNewSession}
+                      />
+                    ) : (
+                      <Navigate to="/" replace />
+                    )
+                  }
+                />
+              </Routes>
+            </Container>
+          </Box>
+        </div>
+      </Router>
     </ThemeProvider>
   );
 };
