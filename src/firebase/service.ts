@@ -1,6 +1,6 @@
 import { auth, db } from './config';
 import { signInAnonymously } from 'firebase/auth';
-import { collection, addDoc, setDoc, doc, Timestamp, getDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, setDoc, doc, Timestamp, getDoc, updateDoc, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 
 // Интерфейс для результата одного предъявления
 interface TrialResult {
@@ -11,7 +11,8 @@ interface TrialResult {
   wordType: 'target' | 'antonym' | 'factor' | 'non-word';
   isCorrect: boolean;
   reactionTimeMs: number;
-  timestamp: Date;
+  model?: string;
+  timestamp?: Date;
 }
 
 interface ParticipantProgress {
@@ -91,21 +92,26 @@ export const updateParticipantProgress = async (
   completedImages: string[]
 ) => {
   try {
+    // Убедимся, что completedImages - это массив
+    const validCompletedImages = Array.isArray(completedImages) ? completedImages : [];
+    
     const progressRef = doc(db, 'progress', participantId);
     const progressDoc = await getDoc(progressRef);
     
     if (progressDoc.exists()) {
       const currentProgress = progressDoc.data() as ParticipantProgress;
+      const currentImages = Array.isArray(currentProgress.completedImages) ? 
+        currentProgress.completedImages : [];
       
       await updateDoc(progressRef, {
-        completedImages: [...new Set([...currentProgress.completedImages, ...completedImages])],
-        totalSessions: currentProgress.totalSessions + 1,
+        completedImages: [...new Set([...currentImages, ...validCompletedImages])],
+        totalSessions: (currentProgress.totalSessions || 0) + 1,
         lastSessionTimestamp: Timestamp.now()
       });
     } else {
       await setDoc(progressRef, {
         nickname,
-        completedImages,
+        completedImages: validCompletedImages,
         totalSessions: 1,
         lastSessionTimestamp: Timestamp.now()
       });
@@ -117,25 +123,44 @@ export const updateParticipantProgress = async (
 };
 
 // Сохранение результата одного предъявления
-export const saveTrialResult = async (result: Omit<TrialResult, 'timestamp'>) => {
+export async function saveTrialResult(result: TrialResult) {
   try {
-    const trialData = {
+    // Загружаем словарь моделей
+    const response = await fetch('/data/dictionary.tsv');
+    if (!response.ok) {
+      console.error('Failed to load dictionary.tsv:', response.status);
+      throw new Error('Failed to load dictionary.tsv');
+    }
+    
+    const text = await response.text();
+    console.log('Dictionary loaded, first 100 chars:', text.slice(0, 100));
+    
+    const rows = text.trim().split('\n').map(row => row.split('\t'));
+    const [header, ...data] = rows;
+    
+    // Получаем номер изображения из имени файла (например, из "123.png" получаем "123")
+    const imageNumber = parseInt(result.imageFileName.split('.')[0]);
+    console.log('Looking for model for image:', imageNumber);
+    
+    // Находим соответствующую модель в словаре
+    const model = data[imageNumber]?.[2]?.trim() || '';
+    console.log('Found model:', model);
+
+    // Добавляем модель и временную метку к результату
+    const resultWithModel = {
       ...result,
-      timestamp: Timestamp.now()
+      model,
+      timestamp: new Date()
     };
 
-    // Создаем уникальный ID на основе данных испытания
-    const trialId = `${result.participantId}_${result.imageFileName}_${Date.now()}`;
-    
-    // Используем setDoc вместо addDoc с уникальным ID
-    await setDoc(doc(db, 'trials', trialId), trialData);
-    console.log('Trial result saved with ID:', trialId);
-    return trialId;
+    console.log('Saving trial result with model:', resultWithModel);
+    const docRef = await addDoc(collection(db, 'trials'), resultWithModel);
+    return docRef.id;
   } catch (error) {
     console.error('Error saving trial result:', error);
     throw error;
   }
-};
+}
 
 // Сохранение результатов сессии
 export const saveSessionResults = async (

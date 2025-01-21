@@ -17,63 +17,56 @@ export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
       }}
     >
       <Box sx={{ p: { xs: 2, sm: 3 }, flex: 1 }}>
-        <Typography variant="h4" align="center" gutterBottom sx={{ mb: 3 }}>
+        <Typography variant="h5" gutterBottom>
           Инструкция
         </Typography>
 
-        <Typography variant="h6" gutterBottom color="primary" sx={{ mt: 3 }}>
+        <Typography variant="h6" sx={{ mt: 2 }}>
           Цель игры
         </Typography>
         <Typography paragraph>
-          Ваша задача — как можно быстрее и точнее определять, является ли показанное слово <strong>настоящим русским словом</strong> или нет. 
-          Между словами будут появляться изображения — это сделано специально, чтобы усложнить задачу и сбить вас с толку. 
-          Чем лучше вы справитесь с отвлекающими факторами, тем больше очков получите!
+          Ваша задача - как можно быстрее и точнее определять, является ли показанное слово правильным русским словом или нет.
+          Чем быстрее и точнее вы отвечаете, тем больше очков получаете.
         </Typography>
 
-        <Typography variant="h6" gutterBottom color="primary" sx={{ mt: 3 }}>
+        <Typography variant="h6" sx={{ mt: 2 }}>
           Процесс игры
         </Typography>
         <Typography paragraph>
-          В каждом раунде вы увидите последовательность:
+          В ходе игры вам будут показаны изображения и слова. Между словами будут появляться изображения, 
+          которые могут отвлекать внимание - умение справляться с этими отвлечениями принесет вам дополнительные очки.
         </Typography>
-        <Box sx={{ pl: 2, mb: 2 }}>
-          <Typography sx={{ mb: 1 }}>
-            1. <strong>Крестик "+"</strong> — сфокусируйте на нём взгляд
-          </Typography>
-          <Typography sx={{ mb: 1 }}>
-            2. <strong>Изображение</strong> — оно появится на короткое время, чтобы отвлечь ваше внимание
-          </Typography>
-          <Typography>
-            3. <strong>Слово</strong> — несмотря на отвлекающие факторы, быстро определите, настоящее оно или нет
-          </Typography>
-        </Box>
 
-        <Typography variant="h6" gutterBottom color="primary" sx={{ mt: 3 }}>
+        <Typography variant="h6" sx={{ mt: 2 }}>
           Управление
         </Typography>
-        <Box sx={{ pl: 2, mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <KeyboardArrowLeft color="primary" />
-            <Typography sx={{ ml: 1 }}>
-              <strong>Левая стрелка</strong> — если это настоящее русское слово
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <KeyboardArrowRight color="primary" />
-            <Typography sx={{ ml: 1 }}>
-              <strong>Правая стрелка</strong> — если это НЕ слово
-            </Typography>
-          </Box>
-        </Box>
+        <Typography paragraph>
+          Используйте клавиши со стрелками для ответа:
+          <br />
+          ← (влево) = "Это НЕ слово"
+          <br />
+          → (вправо) = "Это настоящее слово"
+        </Typography>
 
-        <Typography variant="h6" gutterBottom color="primary" sx={{ mt: 3 }}>
+        <Typography variant="h6" sx={{ mt: 2 }}>
+          Длительность
+        </Typography>
+        <Typography paragraph>
+          Одна сессия занимает примерно 10 минут. Рекомендуется делать перерыв между сессиями и не проходить их подряд,
+          чтобы сохранять концентрацию и давать точные ответы.
+        </Typography>
+
+        <Typography variant="h6" sx={{ mt: 2 }}>
           Система очков
         </Typography>
         <Typography paragraph>
-          • Каждый правильный ответ приносит очки<br />
-          • Быстрые ответы дают больше очков<br />
-          • Точность выше 90% даёт бонусные очки<br />
-          • Ваш результат появится в рейтинге после завершения сессии
+          Очки начисляются за:
+          <br />
+          • Правильное определение настоящих и ненастоящих слов
+          <br />
+          • Скорость реакции
+          <br />
+          • Способность не отвлекаться на изображения
         </Typography>
 
         <Typography variant="body1" sx={{ mt: 3 }} color="text.secondary">

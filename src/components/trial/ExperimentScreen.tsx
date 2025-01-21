@@ -5,87 +5,13 @@ import { WordDisplay } from './WordDisplay';
 import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Session, TrialState, ImageData } from '../../types';
-import { createSession } from '../../utils/trialGenerator';
+import { createSession, IMAGES } from '../../utils/trialGenerator';
 import { saveTrialResult, saveSessionResults, updateLeaderboard, updateParticipantProgress } from '../../firebase/service';
 import { auth } from '../../firebase/config';
 import { getParticipantProgress, getParticipantProgressByNickname } from '../../firebase/service';
 
-// Временные моковые данные
-export const MOCK_IMAGES: ImageData[] = [
-  {
-    id: '1',
-    fileName: 'circle1.svg',
-    url: '/images/circle1.svg',
-    target: 'круг',
-    antonym: 'квадрат'
-  },
-  {
-    id: '2',
-    fileName: 'square1.svg',
-    url: '/images/square1.svg',
-    target: 'квадрат',
-    antonym: 'круг'
-  },
-  {
-    id: '3',
-    fileName: 'triangle1.svg',
-    url: '/images/triangle1.svg',
-    target: 'треугольник',
-    antonym: 'круг'
-  },
-  {
-    id: '4',
-    fileName: 'star1.svg',
-    url: '/images/star1.svg',
-    target: 'звезда',
-    antonym: 'спираль'
-  },
-  {
-    id: '5',
-    fileName: 'spiral1.svg',
-    url: '/images/spiral1.svg',
-    target: 'спираль',
-    antonym: 'звезда'
-  },
-  {
-    id: '6',
-    fileName: 'hexagon1.svg',
-    url: '/images/hexagon1.svg',
-    target: 'шестиугольник',
-    antonym: 'овал'
-  },
-  {
-    id: '7',
-    fileName: 'oval1.svg',
-    url: '/images/oval1.svg',
-    target: 'овал',
-    antonym: 'ромб'
-  },
-  {
-    id: '8',
-    fileName: 'rhombus1.svg',
-    url: '/images/rhombus1.svg',
-    target: 'ромб',
-    antonym: 'крест'
-  },
-  {
-    id: '9',
-    fileName: 'cross1.svg',
-    url: '/images/cross1.svg',
-    target: 'крест',
-    antonym: 'стрелка'
-  },
-  {
-    id: '10',
-    fileName: 'arrow1.svg',
-    url: '/images/arrow1.svg',
-    target: 'стрелка',
-    antonym: 'шестиугольник'
-  }
-];
-
 const IMAGE_DISPLAY_TIME = 500; // ms
-const FIXATION_DISPLAY_TIME = 300; // ms уменьшаем время показа фиксации
+const FIXATION_DISPLAY_TIME = 300; // ms
 
 interface ExperimentScreenProps {
   participant: { 
@@ -111,45 +37,35 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   // Инициализация сессии
   useEffect(() => {
     const initSession = async () => {
-      console.log('Initializing session for participant:', participant);
-      
-      if (!auth.currentUser) {
-        console.error('No authenticated user');
-        navigate('/');
-        return;
-      }
+      if (!participant) return;
 
-      // Получаем прогресс участника только для не тестовых сессий
-      let completedImages = new Set<string>();
-      if (!participant.isTestSession) {
-        // Получаем прогресс по никнейму вместо uid
-        const progressData = await getParticipantProgressByNickname(participant.nickname);
-        if (progressData) {
-          console.log('Participant progress:', progressData.progress);
-          completedImages = new Set(progressData.progress.completedImages);
+      try {
+        // Получаем прогресс участника
+        let completedImages = new Set<string>();
+        if (!participant.isTestSession) {
+          const progressData = await getParticipantProgressByNickname(participant.nickname);
+          if (progressData) {
+            completedImages = new Set(progressData.progress.completedImages);
+          }
         }
-      }
 
-      // Создаем новую сессию с учетом пройденных изображений
-      const newSession = createSession(
-        participant.sessionId,
-        MOCK_IMAGES,
-        completedImages,
-        2 // Пока оставляем 2 картинки для тестирования
-      );
-      
-      if (!newSession) {
-        console.error('Failed to create session');
-        navigate('/completion');
-        return;
+        // Создаем новую сессию
+        const session = await createSession(completedImages);
+        setSession(session);
+        
+        // Если это не тестовая сессия, сохраняем прогресс
+        if (!participant.isTestSession) {
+          await updateParticipantProgress(participant.nickname, {
+            completedImages: Array.from(completedImages)
+          });
+        }
+      } catch (error) {
+        console.error('Error initializing session:', error);
       }
-
-      console.log('Session created:', newSession);
-      setSession(newSession);
     };
 
     initSession();
-  }, [participant.sessionId, navigate]);
+  }, [participant]);
 
   const handleResponse = async (isWord: boolean) => {
     if (!session || !trialState || trialState.showImage || showFixation || isProcessingResponse) return;
@@ -157,7 +73,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     setIsProcessingResponse(true);
     
     const currentTrial = session.trials[session.currentTrialIndex];
-    const reactionTime = Date.now() - trialState.wordStartTime;
+    const reactionTime = Date.now() - (trialState.startTime || 0);
     const isCorrect = (isWord && currentTrial.wordType !== 'non-word') || 
                      (!isWord && currentTrial.wordType === 'non-word');
 
@@ -182,19 +98,10 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
       setCorrectAnswers(prev => prev + 1);
     }
 
-    // Обновляем результат текущего испытания
-    const updatedTrials = [...session.trials];
-    updatedTrials[session.currentTrialIndex] = {
-      ...currentTrial,
-      reactionTime,
-      isCorrect,
-    };
-
     // Переходим к следующему испытанию
     const nextTrialIndex = session.currentTrialIndex + 1;
     
     if (nextTrialIndex >= session.trials.length) {
-      setSession(prev => prev ? { ...prev, completed: true } : null);
       const totalTime = Date.now() - sessionStartTime;
       const finalCorrectAnswers = correctAnswers + (isCorrect ? 1 : 0);
       
@@ -218,25 +125,19 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           }
         );
 
-        // Обновляем прогресс участника по никнейму
-        const completedImages = [...new Set(session.trials.map(t => t.imageId))];
-        const existingProgress = await getParticipantProgressByNickname(participant.nickname);
+        // Обновляем прогресс участника - сохраняем только уникальные imageId
+        const completedImages = [...new Set(session.trials.map(t => t.imageId))].map(id => {
+          const image = IMAGES.find(img => img.id === id);
+          return image ? image.fileName : '';
+        }).filter(Boolean);
+
+        console.log('Saving completed images:', completedImages);
         
-        if (existingProgress) {
-          // Обновляем существующий прогресс
-          await updateParticipantProgress(
-            existingProgress.userId,
-            participant.nickname,
-            completedImages
-          );
-        } else {
-          // Создаем новый прогресс
-          await updateParticipantProgress(
-            auth.currentUser.uid,
-            participant.nickname,
-            completedImages
-          );
-        }
+        await updateParticipantProgress(
+          auth.currentUser.uid,
+          participant.nickname,
+          completedImages
+        );
       }
       
       onComplete({
@@ -248,27 +149,27 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     } else {
       // Обновляем сессию и готовим следующее испытание
       const nextTrial = session.trials[nextTrialIndex];
-      const nextImage = MOCK_IMAGES.find(img => img.id === nextTrial.imageId)!;
+      const nextImage = IMAGES.find(img => img.id === nextTrial.imageId)!;
 
       setSession(prev => prev ? {
         ...prev,
         currentTrialIndex: nextTrialIndex,
-        trials: updatedTrials,
+        completedTrials: prev.completedTrials + 1
       } : null);
 
-      // Показываем фиксационный крест и готовим следующее слово
+      // Показываем фиксационный крест и готовим следующее испытание
       setShowFixation(true);
       setIsProcessingResponse(false);
       
       // Обновляем состояние испытания
-      setTrialState(prev => ({
-        ...prev!,
-        currentImage: nextImage,
-        currentWord: {
-          word: nextTrial.word,
-          type: nextTrial.wordType,
-        },
-      }));
+      setTrialState({
+        trial: nextTrial,
+        image: nextImage,
+        showImage: false,
+        showWord: false,
+        lastResponse: null,
+        startTime: null
+      });
 
       // Сбрасываем lastResponse через 500мс
       setTimeout(() => {
@@ -296,7 +197,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         setTrialState(prev => ({
           ...prev!,
           showImage: true,
-          imageStartTime: Date.now(),
+          startTime: Date.now(),
         }));
       }, FIXATION_DISPLAY_TIME);
       return () => clearTimeout(timer);
@@ -307,7 +208,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         setTrialState(prev => ({
           ...prev!,
           showImage: false,
-          wordStartTime: Date.now(),
+          startTime: Date.now(),
         }));
       }, IMAGE_DISPLAY_TIME);
       return () => clearTimeout(timer);
@@ -319,20 +220,18 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     if (session && !trialState) {
       console.log('Initializing first trial');
       const firstTrial = session.trials[0];
-      const firstImage = MOCK_IMAGES.find(img => img.id === firstTrial.imageId)!;
+      const firstImage = IMAGES.find(img => img.id === firstTrial.imageId)!;
       
       console.log('First trial:', firstTrial);
       console.log('First image:', firstImage);
       
       setTrialState({
+        trial: firstTrial,
+        image: firstImage,
         showImage: false,
-        imageStartTime: 0,
-        wordStartTime: 0,
-        currentImage: firstImage,
-        currentWord: {
-          word: firstTrial.word,
-          type: firstTrial.wordType,
-        },
+        showWord: false,
+        lastResponse: null,
+        startTime: null
       });
       setShowFixation(true);
     }
@@ -395,10 +294,10 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
             +
           </Typography>
         ) : trialState.showImage ? (
-          <ImageDisplay imageUrl={trialState.currentImage.url} />
+          <ImageDisplay imageUrl={trialState.image.url} />
         ) : (
           <Typography variant="h6" sx={{ fontSize: { xs: '24px', sm: '28px' } }}>
-            {trialState.currentWord.word}
+            {trialState.trial.word}
           </Typography>
         )}
       </Box>

@@ -12,7 +12,7 @@ import { Participant, ExperimentStats } from './types';
 import { signInAnonymousUser, getParticipantProgress } from './firebase/service';
 import { auth } from './firebase/config';
 import { User } from 'firebase/auth';
-import { MOCK_IMAGES } from './components/trial/ExperimentScreen';
+import { IMAGES } from './utils/trialGenerator';
 
 const theme = createTheme({
   palette: {
@@ -77,7 +77,7 @@ const App = () => {
     if (user && !participant?.isTestSession) {
       const progress = await getParticipantProgress(user.uid);
       if (progress) {
-        const canStartNewSession = progress.completedImages.length < MOCK_IMAGES.length;
+        const canStartNewSession = progress.completedImages.length < IMAGES.length;
         setCanContinue(canStartNewSession);
       }
     } else {
@@ -119,7 +119,9 @@ const App = () => {
           py: { xs: 0, sm: 2 }
         }}
       >
-        {(!participant || showCompletionScreen) && <DataExport />}
+        {(!participant || showCompletionScreen) && (
+          <DataExport />
+        )}
         <Container
           disableGutters
           sx={{

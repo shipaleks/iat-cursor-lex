@@ -1,4 +1,0 @@
-<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
-      <path d="M125,50 H275 V125 H350 V275 H275 V350 H125 V275 H50 V125 H125 Z" stroke="black" stroke-width="2" fill="none"/>
-      <path d="M125,50 L155,25 L305,25 L275,50" stroke="black" stroke-width="2" fill="none"/>
-    </svg>

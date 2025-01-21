@@ -2,13 +2,14 @@ export interface Participant {
   nickname: string;
   sessionId: string;
   startTime: Date;
+  isTestSession: boolean;
 }
 
 export interface ImageData {
   id: string;
   fileName: string;
   url: string;
-  synonym: string;
+  target: string;
   antonym: string;
 }
 
@@ -17,21 +18,21 @@ export interface CommonWord {
   category: 'aesthetic' | 'harmony' | 'chaos'; // категории слов
 }
 
-export interface WordTrial {
+export interface Trial {
   imageId: string;
   word: string;
-  wordType: 'synonym' | 'antonym' | 'common' | 'non-word';
+  wordType: 'target' | 'antonym' | 'factor' | 'non-word';
   reactionTime?: number;
   isCorrect?: boolean;
 }
 
 export interface Session {
-  id: string;
+  sessionId: string;
   participantId: string;
-  imageIds: string[]; // 10 картинок на сессию
+  imageIds: string[];
   currentImageIndex: number;
   currentTrialIndex: number;
-  trials: WordTrial[];
+  trials: Trial[];
   completed: boolean;
 }
 
@@ -43,6 +44,6 @@ export interface TrialState {
   currentImage: ImageData;
   currentWord: {
     word: string;
-    type: 'synonym' | 'antonym' | 'common' | 'non-word';
+    type: 'target' | 'antonym' | 'factor' | 'non-word';
   };
 } 

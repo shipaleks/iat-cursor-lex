@@ -13,7 +13,6 @@ export interface CommonWord {
 export interface Participant {
   nickname: string;
   sessionId: string;
-  startTime: Date;
   isTestSession: boolean;
 }
 
@@ -23,37 +22,61 @@ export interface ExperimentStats {
   totalTimeMs: number;
 }
 
-export interface Trial {
-  imageId: string;
-  word: string;
-  wordType: 'target' | 'antonym' | 'factor' | 'non-word';
-  reactionTime?: number;
-  isCorrect?: boolean;
-}
-
-export interface Session {
-  trials: Trial[];
-  currentTrialIndex: number;
-  completed: boolean;
-}
-
-export interface TrialState {
-  showImage: boolean;
-  imageStartTime: number;
-  wordStartTime: number;
-  currentImage: ImageData;
-  currentWord: {
-    word: string;
-    type: 'target' | 'antonym' | 'factor' | 'non-word';
-  };
-}
-
 export interface ImageData {
   id: string;
   fileName: string;
   url: string;
   target: string;
   antonym: string;
+}
+
+export type WordType = 'target' | 'antonym' | 'factor' | 'non-word';
+
+export interface Trial {
+  imageId: string;
+  word: string;
+  wordType: WordType;
+}
+
+export interface Session {
+  sessionId: string;
+  trials: Trial[];
+  currentTrialIndex: number;
+  completedTrials: number;
+  totalTrials: number;
+}
+
+export interface TrialResult {
+  imageId: string;
+  word: string;
+  wordType: WordType;
+  isCorrect: boolean;
+  reactionTime: number;
+  participantNickname: string;
+}
+
+export interface TrialState {
+  trial: Trial;
+  image: ImageData;
+  showImage: boolean;
+  showWord: boolean;
+  lastResponse: { isCorrect: boolean; buttonPressed: 'left' | 'right' } | null;
+  startTime: number | null;
+}
+
+export interface ParticipantProgress {
+  nickname: string;
+  progress: {
+    completedImages: string[];
+  };
+}
+
+export interface LeaderboardEntry {
+  nickname: string;
+  totalTrials: number;
+  correctTrials: number;
+  totalTime: number;
+  score: number;
 }
 
 // ... rest of the types ... 
