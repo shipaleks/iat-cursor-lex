@@ -1,25 +1,40 @@
-import WebApp from '@twa-dev/sdk';
+const webAppData = (window as any).Telegram?.WebApp;
 
 export function useTelegram() {
-  const tg = WebApp;
-  const user = tg.initDataUnsafe?.user;
+  const isTelegram = Boolean(webAppData);
+  const tg = isTelegram ? webAppData : {
+    ready: () => {},
+    close: () => {},
+    MainButton: {
+      isVisible: false,
+      show: () => {},
+      hide: () => {}
+    },
+    initDataUnsafe: { user: null },
+    colorScheme: 'light'
+  };
 
   const onClose = () => {
-    tg.close();
+    if (isTelegram) {
+      tg.close();
+    }
   };
 
   const onToggleButton = () => {
-    if (tg.MainButton.isVisible) {
-      tg.MainButton.hide();
-    } else {
-      tg.MainButton.show();
+    if (isTelegram) {
+      if (tg.MainButton.isVisible) {
+        tg.MainButton.hide();
+      } else {
+        tg.MainButton.show();
+      }
     }
   };
 
   return {
     tg,
-    user,
+    user: tg.initDataUnsafe?.user,
     onClose,
     onToggleButton,
+    isTelegram
   };
 } 

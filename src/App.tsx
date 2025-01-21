@@ -33,7 +33,7 @@ const AppContent = () => {
   const [experimentStats, setExperimentStats] = useState<ExperimentStats | null>(null);
   const [canContinue, setCanContinue] = useState(false);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
-  const { tg } = useTelegram();
+  const { tg, isTelegram } = useTelegram();
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -54,9 +54,11 @@ const AppContent = () => {
   }, []);
 
   useEffect(() => {
-    tg.ready();
-    document.documentElement.className = tg.colorScheme;
-  }, [tg]);
+    if (isTelegram) {
+      tg.ready();
+      document.documentElement.className = tg.colorScheme;
+    }
+  }, [tg, isTelegram]);
 
   const handleNicknameSubmit = (nickname: string, isTestSession: boolean, existingUserId?: string) => {
     if (user) {
