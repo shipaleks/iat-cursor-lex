@@ -121,15 +121,20 @@ const App = () => {
       >
         <DataExport />
         <Container
-          maxWidth="sm"
           sx={{
-            height: '80vh',
-            bgcolor: 'background.paper',
-            borderRadius: 2,
-            boxShadow: 3,
+            height: {
+              xs: '100vh', // На мобильных устройствах
+              sm: '80vh'   // На десктопах
+            },
+            maxWidth: 600,
+            mx: 'auto',
             display: 'flex',
             flexDirection: 'column',
+            bgcolor: 'background.paper',
+            borderRadius: { xs: 0, sm: 2 },
+            boxShadow: { xs: 0, sm: 3 },
             overflow: 'hidden',
+            position: 'relative'
           }}
         >
           <Routes>

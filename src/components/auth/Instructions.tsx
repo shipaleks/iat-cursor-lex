@@ -1,66 +1,73 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
 
 interface InstructionsProps {
-  onStart?: () => void;
+  onStart: () => void;
 }
 
 export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
-  const navigate = useNavigate();
-
-  const handleStart = () => {
-    if (onStart) {
-      onStart();
-    }
-    navigate('/experiment');
-  };
-
   return (
-    <Box p={4} display="flex" flexDirection="column" gap={2}>
-      <Typography variant="h4" gutterBottom>
-        Инструкция
-      </Typography>
-      
-      <Typography variant="body1" paragraph>
-        В этом эксперименте вам будут показаны слова на русском языке. Ваша задача - определить, является ли показанное слово реальным словом русского языка или нет.
-      </Typography>
-
-      <Typography variant="body1" paragraph>
-        Между словами будут кратко появляться изображения - они служат в качестве разделителей между предъявлениями слов.
-      </Typography>
-
-      <Typography variant="body1" paragraph>
-        Для ответа используйте:
-      </Typography>
-
-      <Box pl={2} display="flex" flexDirection="column" gap={1}>
-        <Box display="flex" alignItems="center" gap={1}>
-          <KeyboardArrowLeft />
-          <Typography variant="body1">
-            Стрелка влево - если это настоящее слово русского языка
+    <Box
+      sx={{
+        p: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        minHeight: '100%',
+        position: 'relative'
+      }}
+    >
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
+        <Typography variant="h5" gutterBottom align="center">
+          Инструкция
+        </Typography>
+        
+        {/* Контент с инструкциями */}
+        <Box sx={{ mb: 4 }}>
+          <Typography paragraph>
+            В этом эксперименте вам будут показаны изображения и слова.
           </Typography>
-        </Box>
-        <Box display="flex" alignItems="center" gap={1}>
-          <KeyboardArrowRight />
-          <Typography variant="body1">
-            Стрелка вправо - если это не существующее слово
+          <Typography paragraph>
+            Ваша задача - определить, является ли показанное слово настоящим русским словом или нет.
+          </Typography>
+          <Typography paragraph>
+            Порядок выполнения:
+          </Typography>
+          <Typography component="div" sx={{ pl: 2 }}>
+            1. Сначала вы увидите крестик "+" - сфокусируйте на нем взгляд
+            <br />
+            2. Затем появится изображение - внимательно посмотрите на него
+            <br />
+            3. После изображения появится слово
+            <br />
+            4. Вам нужно как можно быстрее решить:
+            <Box sx={{ pl: 3, mt: 1 }}>
+              • Если это настоящее русское слово - нажмите ← (стрелку влево)
+              <br />
+              • Если это НЕ слово - нажмите → (стрелку вправо)
+            </Box>
+          </Typography>
+          <Typography paragraph sx={{ mt: 2 }}>
+            Старайтесь отвечать быстро и правильно. Ваш результат будет зависеть от точности и скорости ответов.
           </Typography>
         </Box>
       </Box>
 
-      <Typography variant="body1" paragraph mt={2}>
-        Старайтесь отвечать как можно быстрее, но при этом правильно. В конце эксперимента вы увидите свои результаты.
-      </Typography>
-
-      <Box mt={4} display="flex" justifyContent="center">
+      {/* Кнопка всегда видна внизу */}
+      <Box sx={{ 
+        pt: 2,
+        borderTop: 1,
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+      }}>
         <Button
           variant="contained"
+          color="primary"
+          fullWidth
+          onClick={onStart}
           size="large"
-          onClick={handleStart}
         >
-          Начать эксперимент
+          Начать
         </Button>
       </Box>
     </Box>
