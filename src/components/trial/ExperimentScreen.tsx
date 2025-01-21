@@ -350,35 +350,43 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     <Box
       sx={{
         height: '100%',
-        width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        position: 'relative',
-        bgcolor: 'background.paper',
+        position: 'relative'
       }}
     >
-      {/* Прогресс бар */}
-      <Box sx={{ width: '100%', px: 2, pt: 2 }}>
-        <LinearProgress 
-          variant="determinate" 
-          value={progress} 
-          sx={{ 
-            height: 8,
-            borderRadius: 4,
-          }}
-        />
+      <Box
+        sx={{
+          p: { xs: 1, sm: 2 },
+          borderBottom: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper'
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          <Box sx={{ flex: 1 }}>
+            <LinearProgress
+              variant="determinate"
+              value={progress}
+              sx={{ height: 6, borderRadius: 1 }}
+            />
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 45 }}>
+            {session.currentTrialIndex + 1}/{session.trials.length}
+          </Typography>
+        </Box>
       </Box>
 
-      {/* Основной контент */}
-      <Box sx={{ 
-        flex: 1, 
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        gap: 2
-      }}>
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative'
+        }}
+      >
         {showFixation ? (
           <Typography variant="h5" sx={{ color: 'text.primary' }}>
             +
@@ -394,47 +402,31 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         )}
       </Box>
 
-      {/* Кнопки ответов */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between',
-        px: 4,
-        py: 2,
-        gap: 2
-      }}>
+      <Box
+        sx={{
+          p: { xs: 1, sm: 2 },
+          borderTop: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          display: 'flex',
+          gap: 1
+        }}
+      >
         <Button
-          variant="contained"
+          variant="outlined"
+          fullWidth
           startIcon={<KeyboardArrowLeft />}
           onClick={() => handleResponse(true)}
-          sx={{
-            width: 200,
-            height: 48,
-            bgcolor: '#f5f5f5',
-            color: lastResponse === 'correct' ? '#4caf50' : 
-                  lastResponse === 'incorrect' ? '#f44336' : '#666',
-            '&:hover': {
-              bgcolor: '#e0e0e0'
-            }
-          }}
         >
-          СЛОВО
+          Слово
         </Button>
         <Button
-          variant="contained"
+          variant="outlined"
+          fullWidth
           endIcon={<KeyboardArrowRight />}
           onClick={() => handleResponse(false)}
-          sx={{
-            width: 200,
-            height: 48,
-            bgcolor: '#f5f5f5',
-            color: lastResponse === 'correct' ? '#4caf50' : 
-                  lastResponse === 'incorrect' ? '#f44336' : '#666',
-            '&:hover': {
-              bgcolor: '#e0e0e0'
-            }
-          }}
         >
-          НЕ СЛОВО
+          Не слово
         </Button>
       </Box>
     </Box>

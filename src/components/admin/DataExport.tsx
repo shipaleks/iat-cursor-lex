@@ -123,13 +123,13 @@ export const DataExport: React.FC = () => {
         size="small"
         sx={{
           bgcolor: 'background.paper',
-          boxShadow: 1,
+          boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
           '&:hover': {
             bgcolor: 'background.paper',
           }
         }}
       >
-        <DownloadIcon />
+        <DownloadIcon fontSize="small" />
       </IconButton>
       <Dialog open={open} onClose={() => setOpen(false)}>
         <DialogTitle>Выгрузка результатов</DialogTitle>
