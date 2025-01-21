@@ -58,7 +58,7 @@ const App = () => {
       setParticipant({
         nickname,
         sessionId: crypto.randomUUID(),
-        startTime: Date.now(),
+        startTime: new Date(),
         isTestSession
       });
 
