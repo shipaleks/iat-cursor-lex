@@ -24,17 +24,18 @@ export interface Session {
   imageIds: string[];
   currentImageIndex: number;
   currentTrialIndex: number;
-  trials: WordTrial[];
+  trials: Trial[];
   completed: boolean;
+  completedTrials?: number;
 }
 
-export type WordType = 'target' | 'antonym' | 'factor' | 'non-word';
-
-export interface WordTrial {
+export interface Trial {
   imageId: string;
   word: string;
   wordType: WordType;
 }
+
+export type WordType = 'target' | 'antonym' | 'factor' | 'non-word';
 
 // Состояние текущего испытания
 export interface TrialState {

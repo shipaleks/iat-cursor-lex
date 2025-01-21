@@ -1,4 +1,4 @@
-import { ImageData, Trial, Session, WordType, WordTrial } from '../types';
+import { ImageData, Trial, Session, WordType } from '../types';
 import { shuffle } from './arrayUtils';
 
 // Загружаем данные из dictionary.tsv
