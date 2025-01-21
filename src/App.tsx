@@ -116,15 +116,16 @@ const App = () => {
         display="flex"
         alignItems="center"
         justifyContent="center"
-        overflow="hidden"
-        position="relative"
+        sx={{
+          py: { xs: 0, sm: 2 }
+        }}
       >
         <DataExport />
         <Container
           sx={{
             height: {
-              xs: '100vh', // На мобильных устройствах
-              sm: '80vh'   // На десктопах
+              xs: '100vh',
+              sm: '90vh'
             },
             maxWidth: 600,
             mx: 'auto',
@@ -133,8 +134,7 @@ const App = () => {
             bgcolor: 'background.paper',
             borderRadius: { xs: 0, sm: 2 },
             boxShadow: { xs: 0, sm: 3 },
-            overflow: 'hidden',
-            position: 'relative'
+            overflow: 'auto'
           }}
         >
           <Routes>
