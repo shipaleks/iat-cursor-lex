@@ -1,4 +1,4 @@
-import { ImageData, Trial, Session, WordType, WordTrial } from '../types';
+import { ImageData, Trial, Session, WordType } from '../types';
 import { shuffle } from './arrayUtils';
 
 // Загружаем данные из dictionary.tsv
@@ -378,49 +378,46 @@ function groupImagesByPairs(images: ImageData[]): ImageData[][] {
 }
 
 export async function createSession(completedImages: Set<string>): Promise<Session> {
-  // Убеждаемся, что изображения загружены
+  // Загружаем изображения, если они еще не загружены
   if (IMAGES.length === 0) {
     await loadImages();
   }
-  
-  // Группируем изображения по парам
-  const imagePairs = groupImagesByPairs(IMAGES);
-  
-  // Перемешиваем пары
-  const shuffledPairs = shuffle(imagePairs);
-  
-  // Выбираем первые 3 пары, которые не были завершены полностью
-  const selectedPairs = shuffledPairs
-    .filter((pair: ImageData[]) => pair.some((img: ImageData) => !completedImages.has(img.fileName)))
-    .slice(0, 3);
 
-  if (selectedPairs.length < 3) {
-    console.log('Not enough incomplete pairs, resetting progress');
-    completedImages.clear();
-    return createSession(completedImages);
+  // Фильтруем изображения, исключая уже использованные
+  const availableImages = IMAGES.filter(img => !completedImages.has(img.fileName));
+  
+  // Если доступных изображений нет, возвращаем пустую сессию
+  if (availableImages.length === 0) {
+    return {
+      sessionId: crypto.randomUUID(),
+      trials: [],
+      currentTrialIndex: 0,
+      completedTrials: 0,
+      totalTrials: 0
+    };
   }
 
-  // Собираем все изображения из выбранных пар
-  const selectedImages = selectedPairs.flat();
-  console.log('Selected images for session:', selectedImages.map((img: ImageData) => img.fileName));
-
-  // Создаем испытания для каждого изображения
-  const trials: Trial[] = [];
-  selectedImages.forEach((img: ImageData) => {
-    trials.push(...createTrialsForImage(img));
+  // Группируем изображения по парам
+  const imagePairs = groupImagesByPairs(availableImages);
+  
+  // Создаем испытания для каждой пары изображений
+  const allTrials: Trial[] = [];
+  imagePairs.forEach(pair => {
+    pair.forEach(image => {
+      allTrials.push(...createTrialsForImage(image));
+    });
   });
 
   // Перемешиваем испытания
-  const shuffledTrials = shuffle(trials);
+  const shuffledTrials = shuffle(allTrials);
 
+  // Создаем и возвращаем сессию
   return {
-    sessionId: Math.random().toString(36).substring(7),
-    participantId: '',
-    imageIds: selectedImages.map((img: ImageData) => img.fileName),
-    currentImageIndex: 0,
-    currentTrialIndex: 0,
+    sessionId: crypto.randomUUID(),
     trials: shuffledTrials,
-    completed: false
+    currentTrialIndex: 0,
+    completedTrials: 0,
+    totalTrials: shuffledTrials.length
   };
 }
 
