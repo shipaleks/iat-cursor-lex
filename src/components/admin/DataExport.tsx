@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress } from '@mui/material';
+import { Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, IconButton } from '@mui/material';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { FACTOR_WORDS } from '../../utils/trialGenerator';
+import DownloadIcon from '@mui/icons-material/Download';
 
 const PIN = '1921';
 
@@ -116,16 +117,20 @@ export const DataExport: React.FC = () => {
   };
 
   return (
-    <>
-      <Button
-        variant="outlined"
-        size="small"
+    <Box sx={{ position: 'fixed', top: 8, right: 8, zIndex: 1000 }}>
+      <IconButton
         onClick={() => setOpen(true)}
-        sx={{ position: 'absolute', top: 16, right: 16 }}
+        size="small"
+        sx={{
+          bgcolor: 'background.paper',
+          boxShadow: 1,
+          '&:hover': {
+            bgcolor: 'background.paper',
+          }
+        }}
       >
-        Выгрузка данных
-      </Button>
-
+        <DownloadIcon />
+      </IconButton>
       <Dialog open={open} onClose={() => setOpen(false)}>
         <DialogTitle>Выгрузка результатов</DialogTitle>
         <DialogContent>
@@ -155,6 +160,6 @@ export const DataExport: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </>
+    </Box>
   );
 }; 

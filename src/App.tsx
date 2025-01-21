@@ -111,23 +111,20 @@ const App = () => {
       <CssBaseline />
       <Box
         width="100vw"
-        minHeight="100vh"
+        height="100vh"
         bgcolor="background.default"
         display="flex"
-        alignItems="center"
-        justifyContent="center"
+        alignItems="stretch"
         sx={{
           py: { xs: 0, sm: 2 }
         }}
       >
         <DataExport />
         <Container
+          disableGutters
           sx={{
-            height: {
-              xs: '100vh',
-              sm: '90vh'
-            },
-            maxWidth: 600,
+            height: '100%',
+            maxWidth: { xs: '100%', sm: 600 },
             mx: 'auto',
             display: 'flex',
             flexDirection: 'column',
