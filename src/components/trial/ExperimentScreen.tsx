@@ -134,9 +134,10 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         console.log('Saving completed images:', completedImages);
         
         await updateParticipantProgress(
-          auth.currentUser.uid,
           participant.nickname,
-          completedImages
+          {
+            completedImages: completedImages
+          }
         );
       }
       

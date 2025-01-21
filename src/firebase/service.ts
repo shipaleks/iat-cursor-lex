@@ -87,29 +87,35 @@ export const getParticipantProgress = async (participantId: string): Promise<Par
 
 // Создание или обновление прогресса участника
 export const updateParticipantProgress = async (
-  participantId: string,
   nickname: string,
-  completedImages: string[]
+  progress: {
+    completedImages: string[];
+  }
 ) => {
   try {
     // Убедимся, что completedImages - это массив
-    const validCompletedImages = Array.isArray(completedImages) ? completedImages : [];
+    const validCompletedImages = Array.isArray(progress.completedImages) ? progress.completedImages : [];
     
-    const progressRef = doc(db, 'progress', participantId);
-    const progressDoc = await getDoc(progressRef);
+    // Ищем документ по никнейму
+    const progressSnapshot = await getDocs(query(
+      collection(db, 'progress'),
+      where('nickname', '==', nickname)
+    ));
     
-    if (progressDoc.exists()) {
+    if (!progressSnapshot.empty) {
+      const progressDoc = progressSnapshot.docs[0];
       const currentProgress = progressDoc.data() as ParticipantProgress;
       const currentImages = Array.isArray(currentProgress.completedImages) ? 
         currentProgress.completedImages : [];
       
-      await updateDoc(progressRef, {
+      await updateDoc(progressDoc.ref, {
         completedImages: [...new Set([...currentImages, ...validCompletedImages])],
         totalSessions: (currentProgress.totalSessions || 0) + 1,
         lastSessionTimestamp: Timestamp.now()
       });
     } else {
-      await setDoc(progressRef, {
+      // Создаем новый документ в коллекции
+      await addDoc(collection(db, 'progress'), {
         nickname,
         completedImages: validCompletedImages,
         totalSessions: 1,
@@ -293,6 +299,23 @@ export const getLeaderboard = async (): Promise<LeaderboardEntry[]> => {
     return entries;
   } catch (error) {
     console.error('Error getting leaderboard:', error);
+    throw error;
+  }
+};
+
+export const clearAllCollections = async () => {
+  try {
+    const collections = ['trials', 'sessions', 'progress', 'leaderboard'];
+    
+    for (const collectionName of collections) {
+      const querySnapshot = await getDocs(collection(db, collectionName));
+      const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+    }
+    
+    console.log('All collections cleared successfully');
+  } catch (error) {
+    console.error('Error clearing collections:', error);
     throw error;
   }
 }; 
