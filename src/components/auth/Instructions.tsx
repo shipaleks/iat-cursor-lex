@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
+import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
 
 interface InstructionsProps {
   onStart: () => void;
@@ -9,55 +10,87 @@ export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
   return (
     <Box
       sx={{
-        p: { xs: 2, sm: 3 },
-        height: '100%',
-        overflow: 'auto',
+        height: '100dvh',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        overflow: 'auto'
       }}
     >
-      <Typography variant="h5" gutterBottom align="center" sx={{ mb: { xs: 1, sm: 2 } }}>
-        Инструкция
-      </Typography>
-      
-      <Box sx={{ flex: 1, mb: { xs: 2, sm: 3 } }}>
-        <Typography sx={{ mb: 1 }}>
-          В этом эксперименте вам будут показаны изображения и слова.
+      <Box sx={{ p: { xs: 2, sm: 3 }, flex: 1 }}>
+        <Typography variant="h4" align="center" gutterBottom sx={{ mb: 3 }}>
+          Инструкция
         </Typography>
-        <Typography sx={{ mb: 1 }}>
-          Ваша задача - определить, является ли показанное слово настоящим русским словом или нет.
+
+        <Typography variant="h6" gutterBottom color="primary" sx={{ mt: 3 }}>
+          Цель игры
         </Typography>
-        <Typography sx={{ mb: 1 }}>
-          Порядок выполнения:
+        <Typography paragraph>
+          Ваша задача — как можно быстрее и точнее определять, является ли показанное слово <strong>настоящим русским словом</strong> или нет. 
+          Чем быстрее и точнее вы отвечаете, тем больше очков получаете!
         </Typography>
-        <Typography component="div" sx={{ pl: 2, mb: 1 }}>
-          1. Сначала вы увидите крестик "+" - сфокусируйте на нем взгляд
-          <br />
-          2. Затем появится изображение - внимательно посмотрите на него
-          <br />
-          3. После изображения появится слово
-          <br />
-          4. Вам нужно как можно быстрее решить:
-          <Box sx={{ pl: 2, mt: 0.5 }}>
-            • Если это настоящее русское слово - нажмите ← (стрелку влево)
-            <br />
-            • Если это НЕ слово - нажмите → (стрелку вправо)
+
+        <Typography variant="h6" gutterBottom color="primary" sx={{ mt: 3 }}>
+          Процесс игры
+        </Typography>
+        <Typography paragraph>
+          В каждом раунде вы увидите:
+        </Typography>
+        <Box sx={{ pl: 2, mb: 2 }}>
+          <Typography sx={{ mb: 1 }}>
+            1. <strong>Крестик "+"</strong> — сфокусируйте на нём взгляд
+          </Typography>
+          <Typography sx={{ mb: 1 }}>
+            2. <strong>Изображение</strong> — внимательно посмотрите на него
+          </Typography>
+          <Typography>
+            3. <strong>Слово</strong> — быстро определите, настоящее оно или нет
+          </Typography>
+        </Box>
+
+        <Typography variant="h6" gutterBottom color="primary" sx={{ mt: 3 }}>
+          Управление
+        </Typography>
+        <Box sx={{ pl: 2, mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <KeyboardArrowLeft color="primary" />
+            <Typography sx={{ ml: 1 }}>
+              <strong>Левая стрелка</strong> — если это настоящее русское слово
+            </Typography>
           </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <KeyboardArrowRight color="primary" />
+            <Typography sx={{ ml: 1 }}>
+              <strong>Правая стрелка</strong> — если это НЕ слово
+            </Typography>
+          </Box>
+        </Box>
+
+        <Typography variant="h6" gutterBottom color="primary" sx={{ mt: 3 }}>
+          Система очков
         </Typography>
-        <Typography>
-          Старайтесь отвечать быстро и правильно. Ваш результат будет зависеть от точности и скорости ответов.
+        <Typography paragraph>
+          • Каждый правильный ответ приносит очки<br />
+          • Быстрые ответы дают больше очков<br />
+          • Точность выше 90% даёт бонусные очки<br />
+          • Ваш результат появится в рейтинге после завершения сессии
+        </Typography>
+
+        <Typography variant="body1" sx={{ mt: 3 }} color="text.secondary">
+          💡 <em>Совет: Старайтесь отвечать быстро, но не в ущерб точности. Идеальный баланс скорости и точности принесёт максимум очков!</em>
         </Typography>
       </Box>
 
-      <Button
-        variant="contained"
-        color="primary"
-        fullWidth
-        onClick={onStart}
-        size="large"
-      >
-        Начать
-      </Button>
+      <Box sx={{ p: { xs: 2, sm: 3 }, borderTop: 1, borderColor: 'divider' }}>
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          size="large"
+          onClick={onStart}
+        >
+          Начать
+        </Button>
+      </Box>
     </Box>
   );
 }; 

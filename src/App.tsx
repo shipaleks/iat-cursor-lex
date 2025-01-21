@@ -119,7 +119,7 @@ const App = () => {
           py: { xs: 0, sm: 2 }
         }}
       >
-        <DataExport />
+        {(!participant || showCompletionScreen) && <DataExport />}
         <Container
           disableGutters
           sx={{
