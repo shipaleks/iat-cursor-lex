@@ -58,8 +58,8 @@ const App = () => {
       setParticipant({
         nickname,
         sessionId: crypto.randomUUID(),
-        startTime: new Date(),
-        isTestSession
+        isTestSession: isTestSession,
+        startTime: new Date()
       });
 
       // Если это существующий пользователь, обновляем текущего пользователя

@@ -58,9 +58,11 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         
         // Если это не тестовая сессия, сохраняем прогресс
         if (!participant.isTestSession) {
-          await updateParticipantProgress(participant.nickname, {
-            completedImages: Array.from(completedImages)
-          });
+          await updateParticipantProgress(
+            auth.currentUser!.uid,
+            participant.nickname,
+            Array.from(completedImages)
+          );
         }
       } catch (error) {
         console.error('Error initializing session:', error);
@@ -137,9 +139,9 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         console.log('Saving completed images:', completedImages);
         
         await updateParticipantProgress(
-          auth.currentUser.uid,
+          auth.currentUser!.uid,
           participant.nickname,
-          completedImages
+          Array.from(completedImages)
         );
       }
       

@@ -24,6 +24,8 @@ export interface Session {
   imageIds: string[];
   currentImageIndex: number;
   currentTrialIndex: number;
+  trials: WordTrial[];
+  completed: boolean;
 }
 
 export type WordType = 'target' | 'antonym' | 'factor' | 'non-word';
