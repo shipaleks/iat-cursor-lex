@@ -377,7 +377,11 @@ function groupImagesByPairs(images: ImageData[]): ImageData[][] {
   return Object.values(pairs);
 }
 
-export async function createSession(completedImages: Set<string>): Promise<Session> {
+export async function createSession(
+  participantId: string,
+  completedImages: string[],
+  isTestSession: boolean
+): Promise<Session> {
   // Убеждаемся, что изображения загружены
   if (IMAGES.length === 0) {
     await loadImages();
@@ -391,23 +395,25 @@ export async function createSession(completedImages: Set<string>): Promise<Sessi
   
   // Выбираем первые 3 пары, которые не были завершены полностью
   const selectedPairs = shuffledPairs
-    .filter((pair: ImageData[]) => pair.some((img: ImageData) => !completedImages.has(img.fileName)))
+    .filter((pair: ImageData[]) => pair.some((img: ImageData) => !completedImages.includes(img.fileName)))
     .slice(0, 3);
 
   if (selectedPairs.length < 3) {
     console.log('Not enough incomplete pairs, resetting progress');
-    completedImages.clear();
-    return createSession(completedImages);
+    return createSession(participantId, [], isTestSession);
   }
 
   // Собираем все изображения из выбранных пар
-  const selectedImages = selectedPairs.flat();
-  console.log('Selected images for session:', selectedImages.map((img: ImageData) => img.fileName));
+  const selectedImages = selectedPairs.flat().map((img: ImageData) => img.fileName);
+  console.log('Selected images for session:', selectedImages);
 
   // Создаем испытания для каждого изображения
   const trials: Trial[] = [];
-  selectedImages.forEach((img: ImageData) => {
-    trials.push(...createTrialsForImage(img));
+  selectedImages.forEach((img: string) => {
+    const image = IMAGES.find(i => i.fileName === img);
+    if (image) {
+      trials.push(...createTrialsForImage(image));
+    }
   });
 
   // Перемешиваем испытания
@@ -415,8 +421,8 @@ export async function createSession(completedImages: Set<string>): Promise<Sessi
 
   return {
     sessionId: Math.random().toString(36).substring(7),
-    participantId: '',
-    imageIds: selectedImages.map((img: ImageData) => img.fileName),
+    participantId,
+    imageIds: selectedImages,
     currentImageIndex: 0,
     currentTrialIndex: 0,
     trials: shuffledTrials,

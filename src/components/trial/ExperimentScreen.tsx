@@ -40,17 +40,20 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
       if (!participant) return;
 
       try {
-        // Получаем прогресс участника
-        let completedImages = new Set<string>();
-        if (!participant.isTestSession) {
-          const progressData = await getParticipantProgressByNickname(participant.nickname);
-          if (progressData) {
-            completedImages = new Set(progressData.progress.completedImages);
-          }
+        const progress = await getParticipantProgress(participant.sessionId);
+        const completedImages = progress?.completedImages || [];
+        
+        // Создаем новую сессию с правильным количеством аргументов
+        const session = await createSession(
+          participant.sessionId,
+          completedImages,
+          participant.isTestSession
+        );
+        
+        if (!session) {
+          throw new Error('Failed to create session');
         }
 
-        // Создаем новую сессию
-        const session = await createSession(completedImages);
         setSession(session);
         
         // Если это не тестовая сессия, сохраняем прогресс
