@@ -103,7 +103,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   const [session, setSession] = useState<Session | null>(null);
   const [trialState, setTrialState] = useState<TrialState | null>(null);
   const [showFixation, setShowFixation] = useState(true);
-  const [lastResponse, setLastResponse] = useState<'correct' | 'incorrect' | null>(null);
+  const [lastResponse, setLastResponse] = useState<{ isCorrect: boolean; button: 'left' | 'right' } | null>(null);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [sessionStartTime] = useState(Date.now());
   const [isProcessingResponse, setIsProcessingResponse] = useState(false);
@@ -174,7 +174,10 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
       });
     }
 
-    setLastResponse(isCorrect ? 'correct' : 'incorrect');
+    setLastResponse({
+      isCorrect: isCorrect,
+      button: isWord ? 'left' : 'right'
+    });
     if (isCorrect) {
       setCorrectAnswers(prev => prev + 1);
     }
@@ -349,7 +352,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   return (
     <Box
       sx={{
-        height: '100vh',
+        height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative'
@@ -418,14 +421,17 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           onClick={() => handleResponse(true)}
           sx={{
             height: { xs: 56, sm: 'auto' },
-            color: lastResponse === 'correct' ? 'success.main' : 
-                  lastResponse === 'incorrect' ? 'error.main' : 'inherit',
-            borderColor: lastResponse === 'correct' ? 'success.main' : 
-                        lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            color: lastResponse?.button === 'left' 
+              ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
+              : 'inherit',
+            borderColor: lastResponse?.button === 'left'
+              ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
+              : 'inherit',
             transition: 'none',
             '&:hover': {
-              borderColor: lastResponse === 'correct' ? 'success.main' : 
-                          lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+              borderColor: lastResponse?.button === 'left'
+                ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
+                : 'inherit',
               transition: 'none'
             },
             '& .MuiTouchRipple-root': {
@@ -442,14 +448,17 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           onClick={() => handleResponse(false)}
           sx={{
             height: { xs: 56, sm: 'auto' },
-            color: lastResponse === 'correct' ? 'success.main' : 
-                  lastResponse === 'incorrect' ? 'error.main' : 'inherit',
-            borderColor: lastResponse === 'correct' ? 'success.main' : 
-                        lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            color: lastResponse?.button === 'right'
+              ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
+              : 'inherit',
+            borderColor: lastResponse?.button === 'right'
+              ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
+              : 'inherit',
             transition: 'none',
             '&:hover': {
-              borderColor: lastResponse === 'correct' ? 'success.main' : 
-                          lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+              borderColor: lastResponse?.button === 'right'
+                ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
+                : 'inherit',
               transition: 'none'
             },
             '& .MuiTouchRipple-root': {
