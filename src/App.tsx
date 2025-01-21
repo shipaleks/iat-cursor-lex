@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { Box, Container, CircularProgress } from '@mui/material';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, BrowserRouter as Router } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { NicknameForm } from './components/auth/NicknameForm';
 import { Instructions } from './components/auth/Instructions';
@@ -13,7 +13,6 @@ import { signInAnonymousUser, getParticipantProgress } from './firebase/service'
 import { auth } from './firebase/config';
 import { User } from 'firebase/auth';
 import { MOCK_IMAGES } from './components/trial/ExperimentScreen';
-import { BrowserRouter as Router } from 'react-router-dom';
 import { useTelegram } from './hooks/useTelegram';
 import './App.css';
 
@@ -26,7 +25,7 @@ const theme = createTheme({
   }
 });
 
-const App = () => {
+const AppContent = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,13 +55,11 @@ const App = () => {
 
   useEffect(() => {
     tg.ready();
-    // Настраиваем тему в соответствии с темой Telegram
     document.documentElement.className = tg.colorScheme;
   }, [tg]);
 
   const handleNicknameSubmit = (nickname: string, isTestSession: boolean, existingUserId?: string) => {
     if (user) {
-      // Если передан existingUserId, используем его вместо текущего ID
       const participantId = existingUserId || user.uid;
       
       setParticipant({
@@ -72,7 +69,6 @@ const App = () => {
         isTestSession
       });
 
-      // Если это существующий пользователь, обновляем текущего пользователя
       if (existingUserId) {
         setUser(prev => prev ? { ...prev, uid: existingUserId } : null);
       }
@@ -83,7 +79,6 @@ const App = () => {
     setExperimentStats(stats);
     setShowCompletionScreen(true);
     
-    // Проверяем, может ли участник продолжить
     if (user && !participant?.isTestSession) {
       const progress = await getParticipantProgress(user.uid);
       if (progress) {
@@ -98,7 +93,6 @@ const App = () => {
   const handleStartNewSession = () => {
     if (participant) {
       setShowCompletionScreen(false);
-      // Создаем новую сессию с новым ID, сохраняя остальные параметры
       setParticipant({
         ...participant,
         sessionId: crypto.randomUUID()
@@ -117,94 +111,100 @@ const App = () => {
   }
 
   return (
+    <Box
+      width="100vw"
+      height="100vh"
+      bgcolor="background.default"
+      display="flex"
+      alignItems="stretch"
+      sx={{
+        py: { xs: 0, sm: 2 }
+      }}
+    >
+      {(!participant || showCompletionScreen) && <DataExport />}
+      <Container
+        disableGutters
+        sx={{
+          height: '100%',
+          maxWidth: { xs: '100%', sm: 600 },
+          mx: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          bgcolor: 'background.paper',
+          borderRadius: { xs: 0, sm: 2 },
+          boxShadow: { xs: 0, sm: 3 },
+          overflow: 'auto'
+        }}
+      >
+        <Routes>
+          <Route
+            path="/"
+            element={
+              user && !participant ? (
+                <NicknameForm onSubmit={handleNicknameSubmit} />
+              ) : (
+                <Navigate to="/instructions" replace />
+              )
+            }
+          />
+          <Route
+            path="/instructions"
+            element={
+              participant ? (
+                <Instructions onStart={() => {
+                  console.log('Starting experiment for participant:', participant.nickname);
+                  setShowCompletionScreen(false);
+                  navigate('/experiment');
+                }} />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route
+            path="/experiment"
+            element={
+              participant ? (
+                <ExperimentScreen
+                  participant={participant}
+                  onComplete={handleExperimentComplete}
+                />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route
+            path="/completion"
+            element={
+              showCompletionScreen && experimentStats ? (
+                <CompletionScreen
+                  participant={participant!}
+                  sessionStats={{
+                    totalTrials: experimentStats.total,
+                    correctTrials: experimentStats.correct
+                  }}
+                  canContinue={canContinue}
+                  onStartNewSession={handleStartNewSession}
+                />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+        </Routes>
+      </Container>
+    </Box>
+  );
+};
+
+const App = () => {
+  return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
         <div className="App">
-          <Box
-            width="100vw"
-            height="100vh"
-            bgcolor="background.default"
-            display="flex"
-            alignItems="stretch"
-            sx={{
-              py: { xs: 0, sm: 2 }
-            }}
-          >
-            {(!participant || showCompletionScreen) && <DataExport />}
-            <Container
-              disableGutters
-              sx={{
-                height: '100%',
-                maxWidth: { xs: '100%', sm: 600 },
-                mx: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                bgcolor: 'background.paper',
-                borderRadius: { xs: 0, sm: 2 },
-                boxShadow: { xs: 0, sm: 3 },
-                overflow: 'auto'
-              }}
-            >
-              <Routes>
-                <Route
-                  path="/"
-                  element={
-                    user && !participant ? (
-                      <NicknameForm onSubmit={handleNicknameSubmit} />
-                    ) : (
-                      <Navigate to="/instructions" replace />
-                    )
-                  }
-                />
-                <Route
-                  path="/instructions"
-                  element={
-                    participant ? (
-                      <Instructions onStart={() => {
-                        console.log('Starting experiment for participant:', participant.nickname);
-                        setShowCompletionScreen(false);
-                        navigate('/experiment');
-                      }} />
-                    ) : (
-                      <Navigate to="/" replace />
-                    )
-                  }
-                />
-                <Route
-                  path="/experiment"
-                  element={
-                    participant ? (
-                      <ExperimentScreen
-                        participant={participant}
-                        onComplete={handleExperimentComplete}
-                      />
-                    ) : (
-                      <Navigate to="/" replace />
-                    )
-                  }
-                />
-                <Route
-                  path="/completion"
-                  element={
-                    showCompletionScreen && experimentStats ? (
-                      <CompletionScreen
-                        participant={participant!}
-                        sessionStats={{
-                          totalTrials: experimentStats.total,
-                          correctTrials: experimentStats.correct
-                        }}
-                        canContinue={canContinue}
-                        onStartNewSession={handleStartNewSession}
-                      />
-                    ) : (
-                      <Navigate to="/" replace />
-                    )
-                  }
-                />
-              </Routes>
-            </Container>
-          </Box>
+          <AppContent />
         </div>
       </Router>
     </ThemeProvider>
