@@ -357,21 +357,21 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     >
       <Box
         sx={{
-          p: { xs: 1, sm: 2 },
+          p: { xs: 0.5, sm: 2 },
           borderBottom: 1,
           borderColor: 'divider',
           bgcolor: 'background.paper'
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Box sx={{ flex: 1 }}>
             <LinearProgress
               variant="determinate"
               value={progress}
-              sx={{ height: 6, borderRadius: 1 }}
+              sx={{ height: 4, borderRadius: 1 }}
             />
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 45 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40, fontSize: 12 }}>
             {session.currentTrialIndex + 1}/{session.trials.length}
           </Typography>
         </Box>
@@ -395,7 +395,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           <ImageDisplay imageUrl={trialState.currentImage.url} />
         ) : (
           <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-            <Typography variant="h6" sx={{ fontSize: '28px' }}>
+            <Typography variant="h6" sx={{ fontSize: { xs: '24px', sm: '28px' } }}>
               {trialState.currentWord.word}
             </Typography>
           </Box>
@@ -404,7 +404,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
 
       <Box
         sx={{
-          p: { xs: 1, sm: 2 },
+          p: { xs: 0.5, sm: 2 },
           borderTop: 1,
           borderColor: 'divider',
           bgcolor: 'background.paper',
@@ -415,16 +415,38 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         <Button
           variant="outlined"
           fullWidth
+          size={isMobile ? "small" : "medium"}
           startIcon={<KeyboardArrowLeft />}
           onClick={() => handleResponse(true)}
+          sx={{
+            color: lastResponse === 'correct' ? 'success.main' : 
+                  lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            borderColor: lastResponse === 'correct' ? 'success.main' : 
+                        lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            '&:hover': {
+              borderColor: lastResponse === 'correct' ? 'success.main' : 
+                          lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            }
+          }}
         >
           Слово
         </Button>
         <Button
           variant="outlined"
           fullWidth
+          size={isMobile ? "small" : "medium"}
           endIcon={<KeyboardArrowRight />}
           onClick={() => handleResponse(false)}
+          sx={{
+            color: lastResponse === 'correct' ? 'success.main' : 
+                  lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            borderColor: lastResponse === 'correct' ? 'success.main' : 
+                        lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            '&:hover': {
+              borderColor: lastResponse === 'correct' ? 'success.main' : 
+                          lastResponse === 'incorrect' ? 'error.main' : 'inherit',
+            }
+          }}
         >
           Не слово
         </Button>
