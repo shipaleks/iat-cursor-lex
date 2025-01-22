@@ -44,10 +44,12 @@ async function loadModelDictionary(): Promise<{ [key: string]: string }> {
     console.log('Header:', header);
     console.log('First row:', data[0]);
     
-    // Создаем словарь, где ключ - имя файла (0.png, 1.png, ...), значение - модель
-    const dict = data.reduce((acc, [, , model], index) => {
+    // Создаем словарь, где ключ - имя файла, значение - модель
+    const dict = data.reduce((acc, [antonym, concept, model], index) => {
+      // Используем индекс для создания имени файла
       const key = `${index}.png`;
       const value = model?.trim() || '';
+      console.log(`Mapping file ${key} to model ${value}`); // Добавляем логирование
       acc[key] = value;
       return acc;
     }, {} as { [key: string]: string });
@@ -82,6 +84,8 @@ export function DataExport() {
       // Получаем все результаты испытаний
       const querySnapshot = await getDocs(collection(db, 'trials'));
       
+      console.log('Model dictionary:', modelDictionary); // Добавляем логирование словаря моделей
+      
       // Преобразуем данные в строки CSV
       const headers = [
         'participantId',
@@ -102,7 +106,11 @@ export function DataExport() {
         .map(doc => {
           const data = doc.data();
           const factorInfo = factorWordMap[data.word] || { factor: '', connotation: '' };
-          const model = modelDictionary[data.imageFileName] || '';
+          // Добавляем ведущие нули к номеру файла для правильного сопоставления
+          const imageNumber = data.imageFileName.match(/\d+/)?.[0];
+          const paddedImageFileName = imageNumber ? `${imageNumber.padStart(1, '0')}.png` : data.imageFileName;
+          const model = modelDictionary[paddedImageFileName] || '';
+          console.log(`Image ${data.imageFileName} (${paddedImageFileName}) mapped to model: ${model}`); // Обновляем логирование
 
           return {
             data: [
