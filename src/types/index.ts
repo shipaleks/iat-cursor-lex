@@ -11,6 +11,7 @@ export interface ImageData {
   url: string;
   target: string;
   antonym: string;
+  model: string;
 }
 
 export interface CommonWord {

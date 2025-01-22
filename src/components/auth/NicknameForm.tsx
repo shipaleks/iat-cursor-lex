@@ -85,7 +85,7 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
             disabled={loading}
           />
         }
-        label="Тестовая сессия (результаты не будут сохранены)"
+        label="Тестовый раунд (результаты не сохранятся, перезагрузите страницу для полной игры)"
       />
 
       <Button

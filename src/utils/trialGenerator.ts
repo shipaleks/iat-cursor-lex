@@ -24,7 +24,8 @@ export async function loadImages(): Promise<ImageData[]> {
       fileName: `${index}.png`,
       url: `/images/${index}.png`,
       target: concept.trim(),
-      antonym: antonym.trim()
+      antonym: antonym.trim(),
+      model: model.trim()
     }));
 
     console.log('Loaded images:', IMAGES);
@@ -38,14 +39,16 @@ export async function loadImages(): Promise<ImageData[]> {
         fileName: '0.png',
         url: '/images/0.png',
         target: 'круг',
-        antonym: 'квадрат'
+        antonym: 'квадрат',
+        model: 'модель1'
       },
       {
         id: '1',
         fileName: '1.png',
         url: '/images/1.png',
         target: 'квадрат',
-        antonym: 'круг'
+        antonym: 'круг',
+        model: 'модель2'
       }
     ];
     return IMAGES;

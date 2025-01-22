@@ -18,7 +18,7 @@ export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
     >
       <Box sx={{ p: { xs: 2, sm: 3 }, flex: 1 }}>
         <Typography variant="h5" gutterBottom>
-          Инструкция
+          Правила игры
         </Typography>
 
         <Typography variant="h6" sx={{ mt: 2 }}>
@@ -33,7 +33,7 @@ export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
           Процесс игры
         </Typography>
         <Typography paragraph>
-          В ходе игры вам будут показаны изображения и слова. Между словами будут появляться изображения, 
+          В каждом раунде вам будут показаны изображения и слова. Между словами будут появляться изображения, 
           которые могут отвлекать внимание - умение справляться с этими отвлечениями принесет вам дополнительные очки.
         </Typography>
 
@@ -43,16 +43,16 @@ export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
         <Typography paragraph>
           Используйте клавиши со стрелками для ответа:
           <br />
-          ← (влево) = "Это НЕ слово"
+          ← (влево) = "Это слово"
           <br />
-          → (вправо) = "Это настоящее слово"
+          → (вправо) = "Это НЕ слово"
         </Typography>
 
         <Typography variant="h6" sx={{ mt: 2 }}>
           Длительность
         </Typography>
         <Typography paragraph>
-          Одна сессия занимает примерно 10 минут. Рекомендуется делать перерыв между сессиями и не проходить их подряд,
+          Один раунд занимает примерно 10 минут. Рекомендуется делать перерыв между раундами и не играть их подряд,
           чтобы сохранять концентрацию и давать точные ответы.
         </Typography>
 

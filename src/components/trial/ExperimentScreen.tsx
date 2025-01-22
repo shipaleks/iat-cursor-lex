@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Typography, LinearProgress, useTheme, useMediaQuery, Button } from '@mui/material';
+import { Box, Typography, LinearProgress, useTheme, useMediaQuery, Button, CircularProgress } from '@mui/material';
 import { ImageDisplay } from './ImageDisplay';
 import { WordDisplay } from './WordDisplay';
 import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
@@ -248,7 +248,59 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   }, [handleKeyPress]);
 
   if (!session || !trialState) {
-    return <Typography>Загрузка...</Typography>;
+    return (
+      <Box
+        sx={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 3,
+          p: 3
+        }}
+      >
+        <CircularProgress
+          size={56}
+          thickness={4}
+          sx={{
+            color: 'primary.main',
+            '& .MuiCircularProgress-circle': {
+              strokeLinecap: 'round',
+            }
+          }}
+        />
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography
+            variant="h6"
+            color="text.primary"
+            gutterBottom
+            sx={{
+              fontWeight: 500,
+              letterSpacing: 0.5
+            }}
+          >
+            Подготовка раунда
+          </Typography>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              maxWidth: 300,
+              mx: 'auto',
+              animation: 'fadeInOut 2s infinite',
+              '@keyframes fadeInOut': {
+                '0%': { opacity: 0.5 },
+                '50%': { opacity: 1 },
+                '100%': { opacity: 0.5 }
+              }
+            }}
+          >
+            Загрузка изображений...
+          </Typography>
+        </Box>
+      </Box>
+    );
   }
 
   const progress = (session.currentTrialIndex / session.trials.length) * 100;

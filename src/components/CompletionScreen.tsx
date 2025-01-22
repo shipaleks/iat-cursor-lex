@@ -35,12 +35,12 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({
     >
       <Box sx={{ p: { xs: 2, sm: 3 } }}>
         <Typography variant="h5" align="center" gutterBottom>
-          Результаты
+          Результаты раунда
         </Typography>
 
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
-            Точность ответов:
+            Точность:
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
             <Box sx={{ flex: 1 }}>
@@ -78,7 +78,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({
 
         {!canContinue && !participant.isTestSession && (
           <Typography sx={{ mt: 2, color: 'success.main' }}>
-            Поздравляем! Вы прошли все изображения. Теперь можно начать новый круг с теми же изображениями.
+            Поздравляем! Вы прошли все раунды. Теперь можно начать новую игру с теми же изображениями.
           </Typography>
         )}
       </Box>
@@ -99,7 +99,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({
             fullWidth
             onClick={onStartNewSession}
           >
-            Продолжить
+            Ещё раунд?
           </Button>
         )}
         <Button
@@ -107,7 +107,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({
           fullWidth
           onClick={() => navigate('/')}
         >
-          {canContinue ? 'Закончить' : 'Начать заново'}
+          {canContinue ? 'Выйти из игры' : 'В начало'}
         </Button>
       </Box>
     </Box>

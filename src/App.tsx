@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { Box, Container, CircularProgress } from '@mui/material';
+import { Box, Container, CircularProgress, Typography } from '@mui/material';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { NicknameForm } from './components/auth/NicknameForm';
@@ -101,9 +101,37 @@ const App = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
-      </Box>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 2,
+            bgcolor: 'background.default'
+          }}
+        >
+          <CircularProgress size={48} thickness={4} />
+          <Typography
+            variant="h6"
+            color="text.secondary"
+            align="center"
+            sx={{
+              animation: 'fadeIn 1.5s infinite alternate',
+              '@keyframes fadeIn': {
+                '0%': { opacity: 0.5 },
+                '100%': { opacity: 1 }
+              }
+            }}
+          >
+            Подготовка к игре...
+          </Typography>
+        </Box>
+      </ThemeProvider>
     );
   }
 
