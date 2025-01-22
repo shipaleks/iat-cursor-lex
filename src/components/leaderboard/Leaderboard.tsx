@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { getLeaderboard } from '../../firebase/service';
+import { getLeaderboard } from '../../firebase/service.tsx';
 
 export interface LeaderboardEntry {
   nickname: string;

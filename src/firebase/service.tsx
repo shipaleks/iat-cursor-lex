@@ -1,4 +1,4 @@
-import { auth, db } from './config';
+import { auth, db } from './config.tsx';
 import { signInAnonymously } from 'firebase/auth';
 import { collection, addDoc, setDoc, doc, Timestamp, getDoc, updateDoc, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 
@@ -22,7 +22,8 @@ interface ParticipantProgress {
   lastSessionTimestamp: Date;
 }
 
-interface LeaderboardEntry {
+// Экспортируем интерфейс LeaderboardEntry
+export interface LeaderboardEntry {
   nickname: string;
   accuracy: number;
   totalTime: number;
@@ -212,27 +213,23 @@ export const updateLeaderboard = async (
       const accuracy = (newTotalCorrect / newTotalTrials) * 100;
       const timeInMinutes = newTotalTime / (1000 * 60);
       
-      // Новая формула рейтинга:
-      // 1. Для точности ниже 75% рейтинг близок к нулю
-      // 2. От 75% до 90% - линейный рост
-      // 3. Выше 90% - экспоненциальный бонус
+      // Расчет баллов за точность (максимум 80 баллов)
       let accuracyScore;
       if (accuracy < 75) {
-        // Ниже 75% - практически нулевой рейтинг
-        accuracyScore = Math.pow(accuracy / 75, 6) * 25; // максимум 25 баллов
+        accuracyScore = Math.pow(accuracy / 75, 6) * 20;
       } else if (accuracy < 90) {
-        // От 75% до 90% - линейный рост от 25 до 75 баллов
-        accuracyScore = 25 + (accuracy - 75) * (50 / 15);
+        accuracyScore = 20 + (accuracy - 75) * (40 / 15);
       } else {
-        // Выше 90% - экспоненциальный рост, максимум примерно 100 баллов
-        accuracyScore = 75 + Math.min(25, Math.pow(1.2, accuracy - 90));
+        accuracyScore = 60 + Math.min(20, Math.pow(1.2, accuracy - 90));
       }
       
-      // Влияние времени: от 0.5 до 1.0
-      const timeMultiplier = Math.max(0.5, 1 - (timeInMinutes - 2) / 8);
+      // Расчет баллов за время (максимум 20 баллов)
+      // Оптимальное время - 8 минут
+      const optimalTime = 8;
+      const timeScore = Math.max(0, 20 * (1 - Math.pow((timeInMinutes - optimalTime) / 10, 2)));
       
-      // Финальный рейтинг от 0 до 100
-      const score = Math.min(100, Math.round(accuracyScore * timeMultiplier));
+      // Финальный рейтинг - сумма баллов за точность и время
+      const score = Math.round(accuracyScore + timeScore);
       
       await updateDoc(leaderboardRef, {
         totalTrials: newTotalTrials,
@@ -248,15 +245,16 @@ export const updateLeaderboard = async (
       
       let accuracyScore;
       if (accuracy < 75) {
-        accuracyScore = Math.pow(accuracy / 75, 6) * 25;
+        accuracyScore = Math.pow(accuracy / 75, 6) * 20;
       } else if (accuracy < 90) {
-        accuracyScore = 25 + (accuracy - 75) * (50 / 15);
+        accuracyScore = 20 + (accuracy - 75) * (40 / 15);
       } else {
-        accuracyScore = 75 + Math.min(25, Math.pow(1.2, accuracy - 90));
+        accuracyScore = 60 + Math.min(20, Math.pow(1.2, accuracy - 90));
       }
       
-      const timeMultiplier = Math.max(0.5, 1 - (timeInMinutes - 2) / 8);
-      const score = Math.min(100, Math.round(accuracyScore * timeMultiplier));
+      const optimalTime = 8;
+      const timeScore = Math.max(0, 20 * (1 - Math.pow((timeInMinutes - optimalTime) / 10, 2)));
+      const score = Math.round(accuracyScore + timeScore);
       
       await setDoc(leaderboardRef, {
         nickname,
@@ -290,9 +288,42 @@ export const getLeaderboard = async (): Promise<LeaderboardEntry[]> => {
       });
     });
     
-    return entries;
+    // Сортируем по убыванию счета
+    return entries.sort((a, b) => b.score - a.score);
   } catch (error) {
     console.error('Error getting leaderboard:', error);
     throw error;
+  }
+};
+
+// Функция для пересчета рейтинга всех участников
+export const recalculateLeaderboardScores = async () => {
+  try {
+    const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
+
+    for (const doc of leaderboardSnapshot.docs) {
+      const data = doc.data();
+      const accuracy = (data.totalCorrect / data.totalTrials) * 100;
+      const timeInMinutes = data.totalTime / (1000 * 60);
+
+      let accuracyScore;
+      if (accuracy < 75) {
+        accuracyScore = Math.pow(accuracy / 75, 6) * 20;
+      } else if (accuracy < 90) {
+        accuracyScore = 20 + (accuracy - 75) * (40 / 15);
+      } else {
+        accuracyScore = 60 + Math.min(20, Math.pow(1.2, accuracy - 90));
+      }
+
+      const optimalTime = 8;
+      const timeScore = Math.max(0, 20 * (1 - Math.pow((timeInMinutes - optimalTime) / 10, 2)));
+      const score = Math.round(accuracyScore + timeScore);
+
+      await updateDoc(doc.ref, { score });
+    }
+
+    console.log('Leaderboard scores recalculated successfully.');
+  } catch (error) {
+    console.error('Error recalculating leaderboard scores:', error);
   }
 }; 

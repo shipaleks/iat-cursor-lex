@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Box, TextField, Button, Typography, FormControlLabel, Checkbox, CircularProgress } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, TextField, Button, Typography, FormControlLabel, Checkbox, CircularProgress, Dialog, DialogTitle, DialogContent, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { getParticipantProgressByNickname } from '../../firebase/service';
+import { getParticipantProgressByNickname, getLeaderboard } from '../../firebase/service.tsx';
 
 interface NicknameFormProps {
   onSubmit: (nickname: string, isTestSession: boolean, existingUserId?: string) => void;
@@ -12,6 +12,8 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
   const [isTestSession, setIsTestSession] = useState(false);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,6 +44,15 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
       setError(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadLeaderboard = async () => {
+    try {
+      const data = await getLeaderboard();
+      setLeaderboardData(data.sort((a, b) => b.score - a.score));
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
     }
   };
 
@@ -88,15 +99,62 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
         label="Тестовый раунд (результаты не сохранятся, перезагрузите страницу для полной игры)"
       />
 
-      <Button
-        type="submit"
-        variant="contained"
-        size="large"
+      <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
+        <Button
+          variant="contained"
+          color="primary"
+          type="submit"
+          disabled={!nickname.trim()}
+        >
+          Продолжить
+        </Button>
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={() => {
+            loadLeaderboard();
+            setShowLeaderboard(true);
+          }}
+        >
+          Рейтинг игроков
+        </Button>
+      </Box>
+
+      <Dialog
+        open={showLeaderboard}
+        onClose={() => setShowLeaderboard(false)}
+        maxWidth="md"
         fullWidth
-        disabled={loading}
       >
-        {loading ? <CircularProgress size={24} /> : 'Начать'}
-      </Button>
+        <DialogTitle>Рейтинг игроков</DialogTitle>
+        <DialogContent>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Место</TableCell>
+                <TableCell>Имя</TableCell>
+                <TableCell align="right">Точность</TableCell>
+                <TableCell align="right">Время</TableCell>
+                <TableCell align="right">Баллы</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {leaderboardData.map((entry, index) => (
+                <TableRow key={entry.nickname}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{entry.nickname}</TableCell>
+                  <TableCell align="right">{entry.accuracy.toFixed(1)}%</TableCell>
+                  <TableCell align="right">
+                    {Math.floor(entry.totalTime / (1000 * 60))}:
+                    {String(Math.floor((entry.totalTime % (1000 * 60)) / 1000)).padStart(2, '0')}
+                  </TableCell>
+                  <TableCell align="right">{Math.round(entry.score)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }; 

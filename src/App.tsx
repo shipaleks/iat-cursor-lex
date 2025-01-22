@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { Box, Container, CircularProgress, Typography } from '@mui/material';
+import { Box, Container, CircularProgress, Typography, Button } from '@mui/material';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { NicknameForm } from './components/auth/NicknameForm';
@@ -10,8 +10,8 @@ import { CompletionScreen } from './components/CompletionScreen';
 import { DataExport } from './components/admin/DataExport';
 import { Participant } from './types';
 import { ExperimentStats } from './types';
-import { signInAnonymousUser, getParticipantProgress } from './firebase/service';
-import { auth } from './firebase/config';
+import { signInAnonymousUser, getParticipantProgress } from './firebase/service.tsx';
+import { auth } from './firebase/config.tsx';
 import { User } from 'firebase/auth';
 import { IMAGES } from './utils/trialGenerator';
 
@@ -130,6 +130,18 @@ const App = () => {
           >
             Подготовка к игре...
           </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              // Логика для отображения рейтинга
+              console.log('Leaderboard button clicked');
+              // Здесь можно добавить код для отображения рейтинга
+            }}
+            sx={{ mt: 2 }}
+          >
+            Показать рейтинг
+          </Button>
         </Box>
       </ThemeProvider>
     );

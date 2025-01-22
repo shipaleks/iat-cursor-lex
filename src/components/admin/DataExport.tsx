@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, IconButton } from '@mui/material';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { db } from '../../firebase/config.tsx';
 import { FACTOR_WORDS } from '../../utils/trialGenerator';
 import DownloadIcon from '@mui/icons-material/Download';
 import { WordType } from '../../types';

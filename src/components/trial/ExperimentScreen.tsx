@@ -6,9 +6,9 @@ import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Session, TrialState, ImageData } from '../../types';
 import { createSession, IMAGES } from '../../utils/trialGenerator';
-import { saveTrialResult, saveSessionResults, updateLeaderboard, updateParticipantProgress } from '../../firebase/service';
-import { auth } from '../../firebase/config';
-import { getParticipantProgress, getParticipantProgressByNickname } from '../../firebase/service';
+import { saveTrialResult, saveSessionResults, updateLeaderboard, updateParticipantProgress } from '../../firebase/service.tsx';
+import { auth } from '../../firebase/config.tsx';
+import { getParticipantProgress, getParticipantProgressByNickname } from '../../firebase/service.tsx';
 
 const IMAGE_DISPLAY_TIME = 500; // ms
 const FIXATION_DISPLAY_TIME = 300; // ms
