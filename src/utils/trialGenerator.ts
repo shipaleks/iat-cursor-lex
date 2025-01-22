@@ -377,6 +377,18 @@ function groupImagesByPairs(images: ImageData[]): ImageData[][] {
   return Object.values(pairs);
 }
 
+// Функция для предварительной загрузки изображений
+function preloadImages(imageUrls: string[]): Promise<void> {
+  return Promise.all(imageUrls.map(url => {
+    return new Promise<void>((resolve, reject) => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+    });
+  })).then(() => {});
+}
+
 export async function createSession(
   participantId: string,
   completedImages: string[],
@@ -406,6 +418,10 @@ export async function createSession(
   // Собираем все изображения из выбранных пар
   const selectedImages = selectedPairs.flat().map((img: ImageData) => img.fileName);
   console.log('Selected images for session:', selectedImages);
+
+  // Предварительная загрузка изображений
+  const imageUrls = selectedImages.map((fileName: string) => `/images/${fileName}`);
+  await preloadImages(imageUrls);
 
   // Создаем испытания для каждого изображения
   const trials: Trial[] = [];
