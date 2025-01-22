@@ -8,7 +8,8 @@ import { Instructions } from './components/auth/Instructions';
 import { ExperimentScreen } from './components/trial/ExperimentScreen';
 import { CompletionScreen } from './components/CompletionScreen';
 import { DataExport } from './components/admin/DataExport';
-import { Participant, ExperimentStats } from './types';
+import { Participant } from './types';
+import { ExperimentStats } from './types';
 import { signInAnonymousUser, getParticipantProgress } from './firebase/service';
 import { auth } from './firebase/config';
 import { User } from 'firebase/auth';
@@ -58,9 +59,9 @@ const App = () => {
       setParticipant({
         nickname,
         sessionId: crypto.randomUUID(),
-        isTestSession: isTestSession,
+        isTestSession,
         startTime: new Date()
-      });
+      } as Participant);
 
       // Если это существующий пользователь, обновляем текущего пользователя
       if (existingUserId) {
