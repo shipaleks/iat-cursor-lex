@@ -426,8 +426,10 @@ export async function createSession(
     currentImageIndex: 0,
     currentTrialIndex: 0,
     trials: shuffledTrials,
-    completed: false
-  };
+    completed: false,
+    completedTrials: 0,
+    totalTrials: shuffledTrials.length
+  } as Session;
 }
 
 // ... rest of the code ... 
