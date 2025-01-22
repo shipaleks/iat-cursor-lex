@@ -27,7 +27,8 @@ export const loadImageData = async (): Promise<ImageData[]> => {
         fileName,
         url: `/images/${fileName}`,
         target,
-        antonym
+        antonym,
+        model: ''
       };
     });
     

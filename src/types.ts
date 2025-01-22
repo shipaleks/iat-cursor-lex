@@ -28,6 +28,7 @@ export interface ImageData {
   url: string;
   target: string;
   antonym: string;
+  model: string;
 }
 
 export type WordType = 'target' | 'antonym' | 'factor' | 'non-word';
