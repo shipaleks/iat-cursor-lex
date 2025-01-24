@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, TextField, Button, Typography, FormControlLabel, Checkbox, CircularProgress, Dialog, DialogTitle, DialogContent, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { Box, TextField, Button, Typography, FormControlLabel, Checkbox, CircularProgress, Dialog, DialogTitle, DialogContent, Table, TableBody, TableCell, TableHead, TableRow, IconButton, Tooltip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { getParticipantProgressByNickname, getLeaderboard } from '../../firebase/service.tsx';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 interface NicknameFormProps {
   onSubmit: (nickname: string, isTestSession: boolean, existingUserId?: string) => void;
@@ -10,7 +11,7 @@ interface NicknameFormProps {
 export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
   const [nickname, setNickname] = useState('');
   const [isTestSession, setIsTestSession] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
@@ -19,11 +20,13 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nickname.trim()) {
-      setError(true);
+      setError('Введите никнейм');
       return;
     }
 
     setLoading(true);
+    setError(null);
+    
     try {
       // Проверяем, существует ли участник с таким никнеймом
       const existingParticipant = await getParticipantProgressByNickname(nickname.trim());
@@ -31,17 +34,17 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
       if (existingParticipant && !isTestSession) {
         // Если это не тестовая сессия и участник существует,
         // используем его существующий ID
-        onSubmit(nickname.trim(), isTestSession, existingParticipant.userId);
+        await onSubmit(nickname.trim(), isTestSession, existingParticipant.userId);
       } else {
         // Если это тестовая сессия или новый участник,
         // создаем новую запись
-        onSubmit(nickname.trim(), isTestSession);
+        await onSubmit(nickname.trim(), isTestSession);
       }
       
       navigate('/instructions');
     } catch (error) {
       console.error('Error checking nickname:', error);
-      setError(true);
+      setError('Произошла ошибка при проверке никнейма. Попробуйте еще раз.');
     } finally {
       setLoading(false);
     }
@@ -79,10 +82,10 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
         value={nickname}
         onChange={(e) => {
           setNickname(e.target.value);
-          setError(false);
+          setError(null);
         }}
-        error={error}
-        helperText={error ? 'Пожалуйста, введите имя' : ''}
+        error={error !== null}
+        helperText={error}
         fullWidth
         autoFocus
         disabled={loading}

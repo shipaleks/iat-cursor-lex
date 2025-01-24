@@ -122,8 +122,8 @@ export function DataExport() {
               data.wordType,
               data.wordType === 'factor' ? factorInfo.factor : '',
               data.wordType === 'factor' ? factorInfo.connotation : 
-                (data.wordType === 'target' ? 'target' : 
-                 data.wordType === 'antonym' ? 'antonym' : ''),
+                (data.wordType === 'target' ? 'positive' : 
+                 data.wordType === 'antonym' ? 'negative' : ''),
               data.isCorrect,
               data.reactionTimeMs,
               data.timestamp?.toDate?.()?.toISOString() || ''

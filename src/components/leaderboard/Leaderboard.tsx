@@ -19,9 +19,10 @@ import { getLeaderboard } from '../../firebase/service.tsx';
 export interface LeaderboardEntry {
   nickname: string;
   accuracy: number;
-  totalTime: number;
+  totalTimeMs: number;
   score: number;
   rank?: number;
+  ratingDetails?: any;
 }
 
 interface LeaderboardProps {
@@ -118,13 +119,15 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname })
             </TableRow>
           </TableHead>
           <TableBody>
-            {displayedEntries.map((entry) => (
+            {displayedEntries.map((entry, index) => (
               <TableRow 
-                key={entry.nickname}
-                sx={{
-                  bgcolor: entry.nickname === currentUserNickname 
-                    ? 'primary.light' 
-                    : 'inherit'
+                key={entry.nickname} 
+                sx={{ 
+                  bgcolor: entry.nickname === currentUserNickname ? 'primary.light' : 'inherit',
+                  color: entry.nickname === currentUserNickname ? 'primary.contrastText' : 'inherit',
+                  '& td': {
+                    color: entry.nickname === currentUserNickname ? 'primary.contrastText' : 'inherit'
+                  }
                 }}
               >
                 <TableCell>{entry.rank}</TableCell>
@@ -133,7 +136,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname })
                   {entry.accuracy.toFixed(1)}%
                 </TableCell>
                 <TableCell align="right">
-                  {formatTime(entry.totalTime)}
+                  {formatTime(entry.totalTimeMs)}
                 </TableCell>
                 <TableCell align="right">
                   {entry.score.toFixed(0)}

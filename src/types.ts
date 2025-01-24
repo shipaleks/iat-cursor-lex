@@ -66,18 +66,30 @@ export interface TrialState {
 }
 
 export interface ParticipantProgress {
+  userId: string;
   nickname: string;
-  progress: {
-    completedImages: string[];
-  };
+  completedImages: string[];
+  totalSessions: number;
+  lastSessionTimestamp: any; // Firebase Timestamp
+  createdAt: any; // Firebase Timestamp
 }
 
 export interface LeaderboardEntry {
   nickname: string;
   totalTrials: number;
   correctTrials: number;
-  totalTime: number;
+  totalTimeMs: number;
   score: number;
+  ratingDetails?: {
+    timeScore: number;
+    accuracyMultiplier: number;
+    roundBonus: number;
+    finalScore: number;
+    theoreticalMinTime: number;
+    actualTime: number;
+    accuracy: number;
+    roundsCompleted: number;
+  };
 }
 
 // ... rest of the types ... 

@@ -61,251 +61,216 @@ export { IMAGES };
 // Слова для факторов
 export const FACTOR_WORDS = [
   // Красота
-  { factor: 'beauty', word: 'красота', connotation: 'positive' },
-  { factor: 'beauty', word: 'прелесть', connotation: 'positive' },
-  { factor: 'beauty', word: 'привлекательность', connotation: 'positive' },
-  { factor: 'beauty', word: 'уродство', connotation: 'negative' },
-  { factor: 'beauty', word: 'безобразие', connotation: 'negative' },
-  { factor: 'beauty', word: 'отвращение', connotation: 'negative' },
-  
-  // Гармония
-  { factor: 'harmony', word: 'гармония', connotation: 'positive' },
-  { factor: 'harmony', word: 'баланс', connotation: 'positive' },
-  { factor: 'harmony', word: 'равновесие', connotation: 'positive' },
-  { factor: 'harmony', word: 'беспорядок', connotation: 'negative' },
-  { factor: 'harmony', word: 'нестабильность', connotation: 'negative' },
-  { factor: 'harmony', word: 'хаос', connotation: 'negative' },
-  
-  // Динамика
-  { factor: 'dynamics', word: 'энергия', connotation: 'positive' },
-  { factor: 'dynamics', word: 'живость', connotation: 'positive' },
-  { factor: 'dynamics', word: 'динамика', connotation: 'positive' },
-  { factor: 'dynamics', word: 'вялость', connotation: 'negative' },
-  { factor: 'dynamics', word: 'статика', connotation: 'negative' },
-  { factor: 'dynamics', word: 'застой', connotation: 'negative' },
-  
-  // Оригинальность
-  { factor: 'originality', word: 'оригинальность', connotation: 'positive' },
-  { factor: 'originality', word: 'новизна', connotation: 'positive' },
-  { factor: 'originality', word: 'свежесть', connotation: 'positive' },
-  { factor: 'originality', word: 'банальность', connotation: 'negative' },
-  { factor: 'originality', word: 'шаблонность', connotation: 'negative' },
-  { factor: 'originality', word: 'избитость', connotation: 'negative' },
+  { factor: 'beauty', word: 'красиво', connotation: 'positive' },
+  { factor: 'beauty', word: 'безобразно', connotation: 'negative' },
   
   // Точность
-  { factor: 'accuracy', word: 'точность', connotation: 'high' },
-  { factor: 'accuracy', word: 'правильность', connotation: 'high' },
-  { factor: 'accuracy', word: 'достоверность', connotation: 'high' },
-  { factor: 'accuracy', word: 'неточность', connotation: 'low' },
-  { factor: 'accuracy', word: 'искажение', connotation: 'low' },
-  { factor: 'accuracy', word: 'ошибочность', connotation: 'low' }
+  { factor: 'accuracy', word: 'точно', connotation: 'positive' },
+  { factor: 'accuracy', word: 'неточно', connotation: 'negative' },
+  
+  // Гармония
+  { factor: 'harmony', word: 'гармонично', connotation: 'positive' },
+  { factor: 'harmony', word: 'хаотично', connotation: 'negative' },
+  
+  // Оригинальность
+  { factor: 'originality', word: 'оригинально', connotation: 'positive' },
+  { factor: 'originality', word: 'банально', connotation: 'negative' }
 ];
 
-// Типичные окончания существительных
-const NOUN_ENDINGS = {
-  masculine: ['ор', 'он', 'ак', 'ик', 'ец', 'от', 'ум', 'ар', 'ир', 'ал'],
-  feminine: ['ость', 'ота', 'ина', 'ица', 'ура', 'ада', 'ия'],
-  neutral: ['ство', 'ние', 'тие', 'ение', 'ание']
-};
-
-// Типы для фонотактических правил
-type ConsonantReplacements = {
-  hard: { [key: string]: string[] };
-  soft: { [key: string]: string[] };
-};
-
-type VowelReplacements = {
-  afterHard: { [key: string]: string[] };
-  afterSoft: { [key: string]: string[] };
-};
-
-// Правила русской фонотактики
-const PHONOTACTICS: {
-  consonantReplacements: ConsonantReplacements;
-  vowelReplacements: VowelReplacements;
-} = {
-  // Допустимые замены для согласных (сохраняя твердость/мягкость)
-  consonantReplacements: {
-    hard: {
-      'б': ['п', 'в', 'м'],
-      'в': ['б', 'ф', 'м'],
-      'г': ['к', 'д', 'х'],
-      'д': ['т', 'г', 'б'],
-      'ж': ['ш', 'з'],
-      'з': ['с', 'д', 'ж'],
-      'к': ['г', 'т', 'х'],
-      'л': ['р', 'н'],
-      'м': ['н', 'б', 'в'],
-      'н': ['м', 'л', 'р'],
-      'п': ['б', 'ф', 'т'],
-      'р': ['л', 'н'],
-      'с': ['з', 'ш'],
-      'т': ['д', 'к', 'п'],
-      'ф': ['п', 'в'],
-      'х': ['к', 'г'],
-      'ш': ['ж', 'с'],
-      'щ': ['ш', 'ч'],
-    },
-    soft: {
-      'бь': ['пь', 'вь'],
-      'вь': ['бь', 'фь'],
-      'гь': ['кь', 'дь'],
-      'дь': ['ть', 'гь'],
-      'зь': ['сь'],
-      'кь': ['гь', 'ть'],
-      'ль': ['рь', 'нь'],
-      'мь': ['нь'],
-      'нь': ['мь', 'ль'],
-      'пь': ['бь', 'фь'],
-      'рь': ['ль', 'нь'],
-      'сь': ['зь'],
-      'ть': ['дь', 'кь'],
-      'фь': ['пь', 'вь'],
-    }
+// Типичные окончания для разных типов слов
+const WORD_ENDINGS = {
+  nouns: {
+    abstract: ['ость', 'ота', 'ство', 'ание', 'ение'],
+    other: ['ак', 'ик', 'ец', 'от', 'ар', 'ир', 'ор', 'ун', 'ыш', 'ач']
   },
-  // Допустимые замены для гласных (сохраняя твердость/мягкость)
-  vowelReplacements: {
-    afterHard: {
-      'а': ['о', 'у'],
-      'о': ['а', 'у'],
-      'у': ['о', 'а'],
-      'ы': ['и', 'у'],
-      'э': ['а', 'о'],
-    },
-    afterSoft: {
-      'я': ['е', 'ю'],
-      'е': ['и', 'я'],
-      'и': ['е', 'ю'],
-      'ю': ['я', 'е'],
-    }
-  }
+  adverbs: ['но', 'во']
 };
 
-// Вычисление расстояния Левенштейна для проверки похожести слов
-const levenshteinDistance = (str1: string, str2: string): number => {
-  const m = str1.length;
-  const n = str2.length;
-  const dp: number[][] = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+// Обновляем список гласных, убирая ю, ё, й, ы
+const VOWELS = new Set(['а', 'е', 'и', 'о', 'у', 'э', 'я']);
 
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (str1[i - 1] === str2[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1];
-      } else {
-        dp[i][j] = Math.min(
-          dp[i - 1][j - 1] + 1,
-          dp[i][j - 1] + 1,
-          dp[i - 1][j] + 1
-        );
-      }
+// Добавляем функцию проверки на последовательные гласные
+function hasConsecutiveVowels(word: string): boolean {
+  const lowered = word.toLowerCase();
+  for (let i = 0; i < lowered.length - 1; i++) {
+    if (VOWELS.has(lowered[i]) && VOWELS.has(lowered[i + 1])) {
+      return true;
     }
   }
+  return false;
+}
 
-  return dp[m][n];
-};
-
-// Генератор не-слов на основе фонотактических правил
-const generateNonWord = (baseWord: string): string => {
-  // Определяем тип существительного по окончанию
-  let wordType = 'masculine';
-  if (baseWord.endsWith('а') || baseWord.endsWith('я') || 
-      baseWord.endsWith('ость') || baseWord.endsWith('ота')) {
-    wordType = 'feminine';
-  } else if (baseWord.endsWith('о') || baseWord.endsWith('е') ||
-             baseWord.endsWith('ие') || baseWord.endsWith('ство')) {
-    wordType = 'neutral';
-  }
-
-  // Берем основу слова (без окончания)
-  let stem = baseWord;
-  ['ость', 'ота', 'ство', 'ние', 'ие', 'ия', 'а', 'я', 'о', 'е'].forEach(ending => {
-    if (stem.endsWith(ending)) {
-      stem = stem.slice(0, -ending.length);
-    }
-  });
-
-  // Разбиваем слово на слоги для лучшего контроля структуры
-  const syllables = stem.match(/[бвгджзклмнпрстфхцчшщ]*[аеиоуыэюя]/gi) || [];
+// Добавляем функцию проверки на три согласные подряд
+function hasThreeConsecutiveConsonants(word: string): boolean {
+  const lowered = word.toLowerCase();
+  let consecutiveCount = 0;
   
-  // Выбираем 1-2 слога для изменения (не трогая первый и последний)
-  const numChanges = Math.floor(Math.random() * 2) + 1;
-  const syllablePositions = new Set<number>();
-  while (syllablePositions.size < numChanges && syllablePositions.size < syllables.length - 2) {
-    const pos = 1 + Math.floor(Math.random() * (syllables.length - 2));
-    if (!syllablePositions.has(pos)) {
-      syllablePositions.add(pos);
+  for (let i = 0; i < lowered.length; i++) {
+    if (!VOWELS.has(lowered[i])) {
+      consecutiveCount++;
+      if (consecutiveCount > 2) return true;
+    } else {
+      consecutiveCount = 0;
     }
   }
+  return false;
+}
 
-  // Модифицируем выбранные слоги
-  syllablePositions.forEach(pos => {
-    const syllable = syllables[pos];
-    const vowelMatch = syllable.match(/[аеиоуыэюя]/i);
-    if (!vowelMatch) return;
+// Обновляем ADVERB_RULES
+const ADVERB_RULES = {
+  // Начальные сочетания согласных
+  initialConsonants: {
+    // Шумный + сонорный
+    obstruentSonorant: ['пр', 'бр', 'тр', 'др', 'кр', 'гр', 'вр', 'пл', 'бл', 'кл', 'гл', 'фл'],
+    // Шумный + шумный
+    obstruentObstruent: ['ст', 'ск', 'сп', 'зд', 'шт', 'жд'],
+    // в + согласный
+    vClusters: ['вз', 'вс', 'вн'],
+    // Одиночные согласные (исключаем ц и щ)
+    single: 'бвгджзклмнпрстфхчш'.split('')
+  },
+  
+  // Суффиксы для наречий с их весами
+  suffixes: [
+    { value: 'тельн', weight: 0.2 },
+    { value: 'ичн', weight: 0.2 },
+    { value: 'альн', weight: 0.2 },
+    { value: 'озн', weight: 0.15 },
+    { value: 'ивн', weight: 0.15 },
+    { value: '', weight: 0.1 } // Для случаев как "красиво"
+  ],
+  
+  // Гласные после шипящих
+  vowelsAfterHushing: ['а', 'о', 'у', 'е', 'и'],
+  
+  // Гласные после ц - удаляем, так как ц исключена
+  
+  // Используем общий список гласных
+  regularVowels: Array.from(VOWELS),
+  
+  hasConsecutiveVowels,
+  hasThreeConsecutiveConsonants
+};
 
-    const vowelIndex = vowelMatch.index!;
-    const consonants = syllable.slice(0, vowelIndex);
-    const vowel = vowelMatch[0];
+// Выбор элемента с учетом весов
+function weightedChoice<T extends { weight: number }>(items: T[]): T {
+  if (!items.length) return items[0];
+  
+  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+  let random = Math.random() * totalWeight;
+  
+  for (const item of items) {
+    random -= item.weight;
+    if (random <= 0) return item;
+  }
+  
+  return items[0];
+}
+
+// Генерация основы слова
+function generateStem(): string {
+  const consonants = ADVERB_RULES.initialConsonants.single;
+  const vowels = ADVERB_RULES.regularVowels;
+  
+  // Создаем основу CVCVCV или CCVCVCV
+  const useCluster = Math.random() < 0.4; // Увеличили вероятность кластера
+  let stem = '';
+  
+  if (useCluster) {
+    const clusters = [
+      ...ADVERB_RULES.initialConsonants.obstruentSonorant,
+      ...ADVERB_RULES.initialConsonants.obstruentObstruent,
+      ...ADVERB_RULES.initialConsonants.vClusters
+    ];
+    stem = clusters[Math.floor(Math.random() * clusters.length)];
+  } else {
+    stem = consonants[Math.floor(Math.random() * consonants.length)];
+  }
+  
+  // Добавляем 2-3 слога CV
+  const syllableCount = 2 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < syllableCount; i++) {
+    // Добавляем гласный
+    stem += vowels[Math.floor(Math.random() * vowels.length)];
     
-    // Изменяем согласные, если они есть
-    if (consonants) {
-      const isLastConsonantSoft = consonants.endsWith('ь');
-      const consonantBase = isLastConsonantSoft ? consonants.slice(0, -1) : consonants;
-      const lastConsonant = consonantBase[consonantBase.length - 1];
+    // Добавляем согласный (кроме последнего слога)
+    if (i < syllableCount - 1) {
+      stem += consonants[Math.floor(Math.random() * consonants.length)];
+    }
+  }
+  
+  return stem;
+}
+
+// Проверка на допустимость сочетаний согласных
+function hasValidConsonantClusters(word: string): boolean {
+  // Проверка на недопустимые сочетания в начале
+  const initialCluster = word.match(/^[бвгджзклмнпрстфхцчшщ]+/)?.[0] || '';
+  if (initialCluster.length > 2) return false;
+  
+  // Проверка на недопустимые сочетания внутри слова
+  const consonantClusters = word.match(/[бвгджзклмнпрстфхцчшщ]{2,}/g) || [];
+  return !consonantClusters.some(cluster => cluster.length > 3);
+}
+
+// Генератор не-слов
+const generateNonWord = (baseWord: string, wordType: WordType, attempts: number = 0): string => {
+  // Если слишком много попыток, возвращаем простое слово
+  if (attempts > 10) {
+    const consonants = ADVERB_RULES.initialConsonants.single;
+    const vowels = ADVERB_RULES.regularVowels;
+    
+    if (wordType === 'factor') {
+      const stem = consonants[Math.floor(Math.random() * consonants.length)] +
+                  vowels[Math.floor(Math.random() * vowels.length)] +
+                  consonants[Math.floor(Math.random() * consonants.length)] +
+                  vowels[Math.floor(Math.random() * vowels.length)];
       
-      if (lastConsonant) {
-        const consonantType = isLastConsonantSoft ? 'soft' : 'hard';
-        const replacements = PHONOTACTICS.consonantReplacements[consonantType];
-        const possibleReplacements = replacements[lastConsonant.toLowerCase() + (isLastConsonantSoft ? 'ь' : '')] || [];
-        
-        if (possibleReplacements.length > 0) {
-          const replacement = possibleReplacements[Math.floor(Math.random() * possibleReplacements.length)];
-          syllables[pos] = consonantBase.slice(0, -1) + replacement + syllable.slice(vowelIndex);
-        }
-      }
+      // Случайный выбор между разными окончаниями
+      const endings = ['ично', 'ально', 'иво'];
+      return stem + endings[Math.floor(Math.random() * endings.length)];
+    } else {
+      return consonants[Math.floor(Math.random() * consonants.length)] +
+             vowels[Math.floor(Math.random() * vowels.length)] +
+             consonants[Math.floor(Math.random() * consonants.length)] +
+             'ость';
     }
-    
-    // Изменяем гласную с учетом предыдущего согласного
-    const prevChar = consonants[consonants.length - 1] || '';
-    const isAfterSoft = /[бвгдзклмнпрстфь]/i.test(prevChar);
-    const replacements = isAfterSoft 
-      ? PHONOTACTICS.vowelReplacements.afterSoft
-      : PHONOTACTICS.vowelReplacements.afterHard;
-    
-    const possibleReplacements = replacements[vowel.toLowerCase()] || [];
-    if (possibleReplacements.length > 0) {
-      const replacement = possibleReplacements[Math.floor(Math.random() * possibleReplacements.length)];
-      syllables[pos] = syllables[pos].slice(0, vowelIndex) + replacement + 
-                       syllables[pos].slice(vowelIndex + 1);
-    }
-  });
-
-  // Собираем слово обратно
-  const newStem = syllables.join('');
-  
-  // Добавляем новое окончание того же типа
-  const endings = NOUN_ENDINGS[wordType as keyof typeof NOUN_ENDINGS];
-  const newEnding = endings[Math.floor(Math.random() * endings.length)];
-  
-  const result = newStem + newEnding;
-  
-  // Проверяем условия:
-  // 1. Не совпадает с исходным словом
-  // 2. Достаточно отличается от исходного
-  // 3. Длиннее 4 букв
-  // 4. Нет повторяющихся букв подряд
-  if (result === baseWord || 
-      result.toLowerCase() === baseWord.toLowerCase() ||
-      levenshteinDistance(result, baseWord) < 2 ||
-      result.length <= 4 ||
-      /(.)\1/.test(result)) {
-    return generateNonWord(baseWord);
   }
 
-  return result;
+  if (wordType === 'factor') {
+    const stem = generateStem();
+    const suffix = weightedChoice(ADVERB_RULES.suffixes);
+    const ending = Math.random() < 0.8 ? 'но' : 'во';
+    const result = stem + suffix.value + ending;
+    
+    if (result === baseWord ||
+        result.length < 5 ||
+        result.length > 11 || // Увеличили максимальную длину
+        hasConsecutiveVowels(result) ||
+        hasThreeConsecutiveConsonants(result) ||
+        /[юёйы]/i.test(result)) {
+      return generateNonWord(baseWord, wordType, attempts + 1);
+    }
+    
+    return result;
+  } else {
+    // Для существительных используем простую генерацию
+    const stem = generateStem();
+    const endingTypes = Math.random() < 0.6 ? WORD_ENDINGS.nouns.other : WORD_ENDINGS.nouns.abstract;
+    const ending = endingTypes[Math.floor(Math.random() * endingTypes.length)];
+    const result = stem + ending;
+    
+    if (result === baseWord ||
+        result.length < 5 ||
+        result.length > 10 ||
+        hasConsecutiveVowels(result) ||
+        hasThreeConsecutiveConsonants(result) ||
+        /[юёйы]/i.test(result)) {
+      return generateNonWord(baseWord, wordType, attempts + 1);
+    }
+    
+    return result;
+  }
 };
 
 /**
@@ -328,8 +293,8 @@ function createTrialsForImage(image: ImageData): Trial[] {
     wordType: 'antonym'
   });
 
-  // 3. Добавляем все факторные слова (30 слов, по 6 для каждой категории)
-  for (const factor of ['beauty', 'harmony', 'dynamics', 'originality', 'accuracy']) {
+  // 3. Добавляем все факторные слова (8 слов, по 2 для каждого фактора)
+  for (const factor of ['beauty', 'accuracy', 'harmony', 'originality']) {
     // Берем все слова для текущего фактора
     const factorWords = FACTOR_WORDS.filter(fw => fw.factor === factor);
     // Добавляем каждое слово
@@ -342,16 +307,34 @@ function createTrialsForImage(image: ImageData): Trial[] {
     }
   }
 
-  // 4. Добавляем не-слова (20 штук), генерируя их из факторных слов
-  const factorWords = FACTOR_WORDS.map(fw => fw.word);
+  // 4. Добавляем не-слова (10 штук)
   const usedNonWords = new Set<string>();
-
-  while (trials.filter(t => t.wordType === 'non-word').length < 20) {
-    const baseWord = factorWords[Math.floor(Math.random() * factorWords.length)];
-    const nonWord = generateNonWord(baseWord);
+  
+  // Генерируем 2 не-слова для концепта/антонима
+  const conceptWords = [image.target, image.antonym];
+  for (let i = 0; i < 2; i++) {
+    const baseWord = conceptWords[Math.floor(Math.random() * conceptWords.length)];
+    let nonWord = generateNonWord(baseWord, 'target');
     
-    // Проверяем, что такого не-слова еще не было и оно не совпадает с реальным словом
-    if (!usedNonWords.has(nonWord) && !factorWords.includes(nonWord)) {
+    while (usedNonWords.has(nonWord)) {
+      nonWord = generateNonWord(baseWord, 'target');
+    }
+    
+    usedNonWords.add(nonWord);
+    trials.push({
+      imageId: image.id,
+      word: nonWord,
+      wordType: 'non-word'
+    });
+  }
+  
+  // Генерируем 8 не-слов для факторных слов
+  const factorWords = FACTOR_WORDS.map(fw => fw.word);
+  while (trials.filter(t => t.wordType === 'non-word').length < 10) {
+    const baseWord = factorWords[Math.floor(Math.random() * factorWords.length)];
+    let nonWord = generateNonWord(baseWord, 'factor');
+    
+    if (!usedNonWords.has(nonWord)) {
       usedNonWords.add(nonWord);
       trials.push({
         imageId: image.id,
@@ -408,12 +391,12 @@ export async function createSession(
   // Перемешиваем пары
   const shuffledPairs = shuffle(imagePairs);
   
-  // Выбираем первые 3 пары, которые не были завершены полностью
+  // Выбираем первые 2 пары (4 изображения), которые не были завершены полностью
   const selectedPairs = shuffledPairs
     .filter((pair: ImageData[]) => pair.some((img: ImageData) => !completedImages.includes(img.fileName)))
-    .slice(0, 3);
+    .slice(0, 2);  // Было 3, стало 2
 
-  if (selectedPairs.length < 3) {
+  if (selectedPairs.length < 2) {  // Было < 3, стало < 2
     console.log('Not enough incomplete pairs, resetting progress');
     return createSession(participantId, [], isTestSession);
   }

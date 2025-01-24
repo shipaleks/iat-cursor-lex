@@ -10,8 +10,7 @@ import { saveTrialResult, saveSessionResults, updateLeaderboard, updateParticipa
 import { auth } from '../../firebase/config.tsx';
 import { getParticipantProgress, getParticipantProgressByNickname } from '../../firebase/service.tsx';
 
-const IMAGE_DISPLAY_TIME = 500; // ms
-const FIXATION_DISPLAY_TIME = 300; // ms
+const IMAGE_DISPLAY_TIME = 1000; // ms
 
 interface ExperimentScreenProps {
   participant: { 
@@ -28,19 +27,19 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [trialState, setTrialState] = useState<TrialState | null>(null);
-  const [showFixation, setShowFixation] = useState(true);
   const [lastResponse, setLastResponse] = useState<{ isCorrect: boolean; button: 'left' | 'right' } | null>(null);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [sessionStartTime] = useState(Date.now());
   const [isProcessingResponse, setIsProcessingResponse] = useState(false);
+  const [wordColor, setWordColor] = useState<'default' | 'success.main' | 'error.main'>('default');
 
   // Инициализация сессии
   useEffect(() => {
     const initSession = async () => {
-      if (!participant) return;
+      if (!participant || !auth.currentUser) return;
 
       try {
-        const progress = await getParticipantProgress(participant.sessionId);
+        const progress = await getParticipantProgress(auth.currentUser.uid);
         const completedImages = progress?.completedImages || [];
         
         // Создаем новую сессию с правильным количеством аргументов
@@ -59,7 +58,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         // Если это не тестовая сессия, сохраняем прогресс
         if (!participant.isTestSession) {
           await updateParticipantProgress(
-            auth.currentUser!.uid,
+            auth.currentUser.uid,
             participant.nickname,
             Array.from(completedImages)
           );
@@ -73,7 +72,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   }, [participant]);
 
   const handleResponse = async (isWord: boolean) => {
-    if (!session || !trialState || trialState.showImage || showFixation || isProcessingResponse) return;
+    if (!session || !trialState || trialState.showImage || isProcessingResponse) return;
 
     setIsProcessingResponse(true);
     
@@ -81,6 +80,15 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     const reactionTime = Date.now() - (trialState.startTime || 0);
     const isCorrect = (isWord && currentTrial.wordType !== 'non-word') || 
                      (!isWord && currentTrial.wordType === 'non-word');
+
+    // Устанавливаем цвет в зависимости от правильности ответа
+    setWordColor(isCorrect ? 'success.main' : 'error.main');
+    
+    // Ждем 300мс для отображения цвета
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Сбрасываем цвет и скрываем слово
+    setWordColor('default');
 
     // Save trial result to Firebase only for non-test sessions
     if (auth.currentUser && !participant.isTestSession) {
@@ -122,26 +130,41 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
 
         // Обновляем таблицу лидеров
         await updateLeaderboard(
+          auth.currentUser.uid,
           participant.nickname,
-          {
-            totalTrials: session.trials.length,
-            correctTrials: finalCorrectAnswers,
-            totalTimeMs: totalTime
-          }
+          session.trials.length,
+          finalCorrectAnswers,
+          totalTime
         );
 
-        // Обновляем прогресс участника - сохраняем только уникальные imageId
-        const completedImages = [...new Set(session.trials.map(t => t.imageId))].map(id => {
-          const image = IMAGES.find(img => img.id === id);
-          return image ? image.fileName : '';
-        }).filter(Boolean);
+        // Получаем только уникальные изображения для текущего раунда
+        const uniqueCompletedImages = [...new Set(session.trials
+          .map(t => {
+            const image = IMAGES.find(img => img.id === t.imageId);
+            return image?.fileName;
+          })
+          .filter((fileName): fileName is string => fileName !== undefined && fileName !== null))];
 
-        console.log('Saving completed images:', completedImages);
-        
+        // Получаем текущий прогресс
+        const currentProgress = await getParticipantProgress(auth.currentUser.uid);
+        console.log('Current progress from Firebase:', currentProgress);
+
+        // Проверяем, что изображения из текущего раунда еще не были пройдены
+        const existingImages = currentProgress?.completedImages || [];
+        console.log('Existing completed images:', existingImages);
+
+        // Фильтруем только новые изображения из текущего раунда
+        const newImages = uniqueCompletedImages.filter(img => !existingImages.includes(img));
+        console.log('New images to add:', newImages);
+
+        // Объединяем с уже пройденными изображениями
+        const allCompletedImages = [...existingImages, ...newImages];
+        console.log('All completed images after merge:', allCompletedImages);
+
         await updateParticipantProgress(
-          auth.currentUser!.uid,
+          auth.currentUser.uid,
           participant.nickname,
-          Array.from(completedImages)
+          allCompletedImages
         );
       }
       
@@ -162,15 +185,11 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         completedTrials: prev.completedTrials + 1
       } : null);
 
-      // Показываем фиксационный крест и готовим следующее испытание
-      setShowFixation(true);
-      setIsProcessingResponse(false);
-      
       // Обновляем состояние испытания
       setTrialState({
         trial: nextTrial,
         image: nextImage,
-        showImage: false,
+        showImage: true,
         showWord: false,
         lastResponse: null,
         startTime: null
@@ -180,6 +199,9 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
       setTimeout(() => {
         setLastResponse(null);
       }, 500);
+
+      // Разрешаем новые ответы
+      setIsProcessingResponse(false);
     }
   };
 
@@ -192,21 +214,9 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     }
   }, [handleResponse]);
 
-  // Управление показом фиксации, изображения и слова
+  // Управление показом изображения и слова
   useEffect(() => {
     if (!session || !trialState) return;
-
-    if (showFixation) {
-      const timer = setTimeout(() => {
-        setShowFixation(false);
-        setTrialState(prev => ({
-          ...prev!,
-          showImage: true,
-          startTime: Date.now(),
-        }));
-      }, FIXATION_DISPLAY_TIME);
-      return () => clearTimeout(timer);
-    }
 
     if (trialState.showImage) {
       const timer = setTimeout(() => {
@@ -218,7 +228,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
       }, IMAGE_DISPLAY_TIME);
       return () => clearTimeout(timer);
     }
-  }, [showFixation, trialState?.showImage, session]);
+  }, [trialState?.showImage, session]);
 
   // Инициализация первого испытания
   useEffect(() => {
@@ -233,12 +243,11 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
       setTrialState({
         trial: firstTrial,
         image: firstImage,
-        showImage: false,
+        showImage: true,
         showWord: false,
         lastResponse: null,
         startTime: null
       });
-      setShowFixation(true);
     }
   }, [session, trialState]);
 
@@ -257,7 +266,8 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           justifyContent: 'center',
           alignItems: 'center',
           gap: 3,
-          p: 3
+          p: 3,
+          bgcolor: 'grey.200'
         }}
       >
         <CircularProgress
@@ -311,7 +321,8 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
-        position: 'relative'
+        position: 'relative',
+        bgcolor: 'grey.200'
       }}
     >
       {/* Прогресс бар */}
@@ -320,7 +331,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           p: 1,
           borderBottom: 1,
           borderColor: 'divider',
-          bgcolor: 'background.paper'
+          bgcolor: 'grey.100'
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -328,7 +339,14 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
             <LinearProgress
               variant="determinate"
               value={progress}
-              sx={{ height: 4, borderRadius: 1 }}
+              sx={{ 
+                height: 4, 
+                borderRadius: 1,
+                bgcolor: 'grey.300',
+                '& .MuiLinearProgress-bar': {
+                  bgcolor: 'primary.main'
+                }
+              }}
             />
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ minWidth: 40, fontSize: 12 }}>
@@ -343,17 +361,21 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           flex: 1,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          bgcolor: 'grey.100'
         }}
       >
-        {showFixation ? (
-          <Typography variant="h5" sx={{ color: 'text.primary' }}>
-            +
-          </Typography>
-        ) : trialState.showImage ? (
+        {trialState.showImage ? (
           <ImageDisplay imageUrl={trialState.image.url} />
         ) : (
-          <Typography variant="h6" sx={{ fontSize: { xs: '24px', sm: '28px' } }}>
+          <Typography 
+            variant="h4" 
+            sx={{ 
+              fontSize: { xs: '28px', sm: '32px' },
+              transition: 'color 0.2s ease',
+              color: wordColor
+            }}
+          >
             {trialState.trial.word}
           </Typography>
         )}
@@ -364,7 +386,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         sx={{
           borderTop: 1,
           borderColor: 'divider',
-          bgcolor: 'background.paper',
+          bgcolor: 'grey.100',
           display: 'flex',
           gap: 1,
           p: 1

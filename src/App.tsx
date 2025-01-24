@@ -10,7 +10,7 @@ import { CompletionScreen } from './components/CompletionScreen';
 import { DataExport } from './components/admin/DataExport';
 import { Participant } from './types';
 import { ExperimentStats } from './types';
-import { signInAnonymousUser, getParticipantProgress } from './firebase/service.tsx';
+import { signInAnonymousUser, getParticipantProgress, getParticipantProgressByNickname } from './firebase/service.tsx';
 import { auth } from './firebase/config.tsx';
 import { User } from 'firebase/auth';
 import { IMAGES } from './utils/trialGenerator';
@@ -18,8 +18,11 @@ import { IMAGES } from './utils/trialGenerator';
 const theme = createTheme({
   palette: {
     background: {
-      default: '#f5f5f5',
-      paper: '#ffffff'
+      default: '#e0e0e0',
+      paper: '#f5f5f5'
+    },
+    primary: {
+      main: '#000000'
     }
   }
 });
@@ -32,6 +35,7 @@ const App = () => {
   const [experimentStats, setExperimentStats] = useState<ExperimentStats | null>(null);
   const [canContinue, setCanContinue] = useState(false);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
+  const [completedImages, setCompletedImages] = useState<string[]>([]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -44,6 +48,15 @@ const App = () => {
         }
       } else {
         setUser(user);
+        // Загружаем прогресс при авторизации
+        try {
+          const progress = await getParticipantProgress(user.uid);
+          if (progress) {
+            setCompletedImages(progress.completedImages || []);
+          }
+        } catch (error) {
+          console.error('Error loading progress:', error);
+        }
       }
       setLoading(false);
     });
@@ -51,22 +64,26 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleNicknameSubmit = (nickname: string, isTestSession: boolean, existingUserId?: string) => {
-    if (user) {
-      // Если передан existingUserId, используем его вместо текущего ID
-      const participantId = existingUserId || user.uid;
-      
-      setParticipant({
-        nickname,
-        sessionId: crypto.randomUUID(),
-        isTestSession,
-        startTime: new Date()
-      } as Participant);
+  const handleNicknameSubmit = async (nickname: string, isTestSession: boolean, existingUserId?: string) => {
+    try {
+      // Сначала выполняем анонимный вход для получения нового userId
+      const newUser = await signInAnonymousUser();
+      if (newUser) {
+        // Для нового пользователя или тестовой сессии начинаем с пустого прогресса
+        setCompletedImages([]);
+        
+        // Создаем нового участника
+        setParticipant({
+          nickname,
+          sessionId: crypto.randomUUID(),
+          isTestSession,
+          startTime: new Date()
+        } as Participant);
 
-      // Если это существующий пользователь, обновляем текущего пользователя
-      if (existingUserId) {
-        setUser(prev => prev ? { ...prev, uid: existingUserId } : null);
+        navigate('/instructions');
       }
+    } catch (error) {
+      console.error('Error in handleNicknameSubmit:', error);
     }
   };
 
@@ -76,10 +93,27 @@ const App = () => {
     
     // Проверяем, может ли участник продолжить
     if (user && !participant?.isTestSession) {
-      const progress = await getParticipantProgress(user.uid);
-      if (progress) {
-        const canStartNewSession = progress.completedImages.length < IMAGES.length;
-        setCanContinue(canStartNewSession);
+      try {
+        const progress = await getParticipantProgress(user.uid);
+        if (progress) {
+          // Обновляем состояние completedImages
+          setCompletedImages(progress.completedImages || []);
+          const canStartNewSession = (progress.completedImages || []).length < IMAGES.length;
+          console.log('Progress check:', { 
+            completedImages: progress.completedImages, 
+            totalImages: IMAGES.length, 
+            canStartNewSession 
+          });
+          setCanContinue(canStartNewSession);
+        } else {
+          // Если прогресса нет, значит это первый раунд
+          setCompletedImages([]);
+          setCanContinue(true);
+        }
+      } catch (error) {
+        console.error('Error checking progress:', error);
+        // В случае ошибки позволяем продолжить
+        setCanContinue(true);
       }
     } else {
       setCanContinue(false);
@@ -130,18 +164,40 @@ const App = () => {
           >
             Подготовка к игре...
           </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => {
-              // Логика для отображения рейтинга
-              console.log('Leaderboard button clicked');
-              // Здесь можно добавить код для отображения рейтинга
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              width: '200px', // Фиксированная ширина для контейнера кнопок
             }}
-            sx={{ mt: 2 }}
           >
-            Показать рейтинг
-          </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => {
+                // Логика для отображения рейтинга
+                console.log('Leaderboard button clicked');
+              }}
+              sx={{ 
+                width: '100%',
+                boxShadow: 0
+              }}
+            >
+              Рейтинг игроков
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => navigate('/instructions')}
+              sx={{ 
+                width: '100%',
+                boxShadow: 0
+              }}
+            >
+              Продолжить
+            </Button>
+          </Box>
         </Box>
       </ThemeProvider>
     );
@@ -218,15 +274,17 @@ const App = () => {
             <Route
               path="/completion"
               element={
-                showCompletionScreen && experimentStats ? (
+                showCompletionScreen && participant && experimentStats ? (
                   <CompletionScreen
-                    participant={participant!}
+                    participant={participant}
                     sessionStats={{
                       totalTrials: experimentStats.total,
-                      correctTrials: experimentStats.correct
+                      correctTrials: experimentStats.correct,
+                      totalTimeMs: experimentStats.totalTimeMs
                     }}
                     canContinue={canContinue}
                     onStartNewSession={handleStartNewSession}
+                    completedImages={completedImages}
                   />
                 ) : (
                   <Navigate to="/" replace />

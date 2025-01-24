@@ -18,16 +18,21 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ imageUrl }) => {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
+        padding: { xs: '0.5rem', sm: '1rem' },
       }}
     >
-      <img
+      <Box
+        component="img"
         src={imageUrl}
         alt="Stimulus"
-        style={{
+        sx={{
+          display: 'block',
           maxWidth: '100%',
           maxHeight: '100%',
+          width: 'auto',
+          height: 'auto',
           objectFit: 'contain',
-          padding: isMobile ? '0.5rem' : '1rem',
+          borderRadius: '8px',
         }}
       />
     </Box>

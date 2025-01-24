@@ -13,7 +13,8 @@ export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
         height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'auto'
+        overflow: 'auto',
+        bgcolor: 'grey.100'
       }}
     >
       <Box sx={{ p: { xs: 2, sm: 3 }, flex: 1 }}>
@@ -52,7 +53,7 @@ export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
           Длительность
         </Typography>
         <Typography paragraph>
-          Один раунд занимает примерно 10 минут. Рекомендуется делать перерыв между раундами и не играть их подряд,
+          Один раунд занимает примерно 3 минуты. Рекомендуется делать перерыв между раундами и не играть их подряд,
           чтобы сохранять концентрацию и давать точные ответы.
         </Typography>
 
@@ -74,7 +75,7 @@ export const Instructions: React.FC<InstructionsProps> = ({ onStart }) => {
         </Typography>
       </Box>
 
-      <Box sx={{ p: { xs: 2, sm: 3 }, borderTop: 1, borderColor: 'divider' }}>
+      <Box sx={{ p: { xs: 2, sm: 3 }, borderTop: 1, borderColor: 'divider', bgcolor: 'grey.100' }}>
         <Button
           variant="contained"
           color="primary"
