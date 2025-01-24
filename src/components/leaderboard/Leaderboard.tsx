@@ -10,7 +10,8 @@ import {
   TableRow,
   Paper,
   IconButton,
-  Collapse
+  Collapse,
+  SxProps
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -27,9 +28,10 @@ export interface LeaderboardEntry {
 
 interface LeaderboardProps {
   currentUserNickname?: string;
+  sx?: SxProps;
 }
 
-export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname }) => {
+export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, sx }) => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -88,7 +90,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname })
       : [...top5, ...(currentUser ? [currentUser] : [])];
 
   return (
-    <Box sx={{ width: '100%', mb: 4 }}>
+    <Box sx={{ width: '100%', mb: 4, ...sx }}>
       <Typography variant="h5" gutterBottom align="center">
         Таблица лидеров
       </Typography>
