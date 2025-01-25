@@ -31,16 +31,18 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
       // Проверяем, существует ли участник с таким никнеймом
       const existingParticipant = await getParticipantProgressByNickname(nickname.trim());
       
-      if (existingParticipant && !isTestSession) {
-        // Если это не тестовая сессия и участник существует,
-        // используем его существующий ID
-        await onSubmit(nickname.trim(), isTestSession, existingParticipant.userId);
-      } else {
-        // Если это тестовая сессия или новый участник,
-        // создаем новую запись
-        await onSubmit(nickname.trim(), isTestSession);
+      if (existingParticipant) {
+        if (isTestSession) {
+          setError('Этот никнейм уже используется. Для тестовой сессии, пожалуйста, выберите другой никнейм.');
+        } else {
+          setError('Этот никнейм уже используется. Если это вы, пожалуйста, продолжите игру на том устройстве, где вы её начали, или используйте другой никнейм.');
+        }
+        setLoading(false);
+        return;
       }
-      
+
+      // Если это новый никнейм
+      await onSubmit(nickname.trim(), isTestSession);
       navigate('/instructions');
     } catch (error) {
       console.error('Error checking nickname:', error);
