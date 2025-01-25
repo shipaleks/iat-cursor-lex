@@ -164,7 +164,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
 };
 
 // Добавляем функцию форматирования времени
-const formatTime = (ms: number): string => {
+const formatTime = (ms: number | undefined | null): string => {
+  if (!ms) return '0:00';
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;

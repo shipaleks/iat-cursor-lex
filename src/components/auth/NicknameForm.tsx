@@ -150,8 +150,8 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
                   <TableCell>{entry.nickname}</TableCell>
                   <TableCell align="right">{entry.accuracy.toFixed(1)}%</TableCell>
                   <TableCell align="right">
-                    {Math.floor(entry.totalTime / (1000 * 60))}:
-                    {String(Math.floor((entry.totalTime % (1000 * 60)) / 1000)).padStart(2, '0')}
+                    {Math.floor(entry.totalTimeMs / (1000 * 60))}:
+                    {String(Math.floor((entry.totalTimeMs % (1000 * 60)) / 1000)).padStart(2, '0')}
                   </TableCell>
                   <TableCell align="right">{Math.round(entry.score)}</TableCell>
                 </TableRow>
