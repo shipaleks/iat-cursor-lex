@@ -174,7 +174,7 @@ export function DataExport() {
           <TextField
             autoFocus
             margin="dense"
-            label="PIN-код"
+            label="Пароль"
             type="password"
             fullWidth
             value={pin}
@@ -183,7 +183,7 @@ export function DataExport() {
               setError(false);
             }}
             error={error}
-            helperText={error ? 'Неверный PIN-код' : ''}
+            helperText={error ? 'Неверный пароль' : ''}
           />
         </DialogContent>
         <DialogActions>

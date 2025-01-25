@@ -157,65 +157,53 @@ export const getParticipantProgress = async (participantId: string): Promise<Par
 };
 
 // Создание или обновление прогресса участника
-export async function updateParticipantProgress(
-  userId: string,
-  nickname: string,
+export const updateParticipantProgress = async (
+  participantId: string,
+  participantNickname: string,
   completedImages: string[]
-) {
-  const db = getFirestore();
-  console.log('Updating progress for user:', userId, 'nickname:', nickname);
-
+): Promise<void> => {
   try {
-    // Проверяем, не занят ли никнейм другим пользователем
-    const nicknamesRef = collection(db, 'nicknames');
-    const nicknameQuery = query(nicknamesRef, where('nickname', '==', nickname));
-    const nicknameSnapshot = await getDocs(nicknameQuery);
-
-    if (!nicknameSnapshot.empty) {
-      const existingDoc = nicknameSnapshot.docs[0];
-      const existingUserId = existingDoc.data().userId;
-
-      if (existingUserId !== userId) {
-        console.error('Nickname is already taken by another user');
+    // Проверяем, существует ли никнейм
+    const nicknameDoc = await getDoc(doc(db, 'nicknames', participantNickname));
+    
+    if (nicknameDoc.exists()) {
+      const existingUserId = nicknameDoc.data().userId;
+      // Если никнейм уже занят другим пользователем, выбрасываем ошибку
+      if (existingUserId !== participantId) {
         throw new Error('Nickname is already taken by another user');
       }
+      // Если это тот же пользователь, продолжаем обновление
     }
 
-    // Создаем или обновляем запись в коллекции nicknames
-    const nicknameDoc = doc(db, 'nicknames', nickname);
-    await setDoc(nicknameDoc, {
-      userId,
-      nickname,
-      updatedAt: serverTimestamp()
+    // Обновляем или создаем запись в коллекции nicknames
+    await setDoc(doc(db, 'nicknames', participantNickname), {
+      userId: participantId,
+      lastUpdated: serverTimestamp()
     });
 
-    // Обновляем прогресс пользователя
-    const progressRef = doc(db, 'progress', userId);
+    // Обновляем прогресс участника
+    const progressRef = doc(db, 'progress', participantId);
     const progressDoc = await getDoc(progressRef);
 
-    if (!progressDoc.exists()) {
+    if (progressDoc.exists()) {
+      // Обновляем существующий прогресс
+      await updateDoc(progressRef, {
+        completedImages: completedImages,
+        lastUpdated: serverTimestamp()
+      });
+    } else {
       // Создаем новый документ прогресса
       await setDoc(progressRef, {
         completedImages: completedImages,
-        totalSessions: 1,
         createdAt: serverTimestamp(),
-        lastSessionTimestamp: serverTimestamp()
+        lastUpdated: serverTimestamp()
       });
-      console.log('Created new progress document for user:', userId);
-    } else {
-      // Обновляем существующий документ
-      await updateDoc(progressRef, {
-        completedImages: completedImages,
-        totalSessions: progressDoc.data().totalSessions + 1,
-        lastSessionTimestamp: serverTimestamp()
-      });
-      console.log('Updated existing progress document for user:', userId);
     }
   } catch (error) {
     console.error('Error updating participant progress:', error);
     throw error;
   }
-}
+};
 
 // Сохранение результата одного предъявления
 export async function saveTrialResult(result: TrialResult) {
@@ -469,34 +457,32 @@ export async function calculateRating(
   totalTimeMs: number,
   roundsCompleted: number
 ): Promise<RatingCalculation> {
-  // Теоретическое минимальное время: 1.5 секунды на каждое слово
-  const theoreticalMinTime = totalTrials * 1500;
+  // 1. Вычисляем точность (0-1)
+  const accuracy = correctTrials / totalTrials;
   
-  // Оценка времени (до 15 баллов)
-  // Если время больше оптимального, уменьшаем баллы пропорционально превышению
-  const timeRatio = theoreticalMinTime / totalTimeMs; // Чем медленнее, тем меньше отношение
-  const timeScore = Math.round(15 * Math.min(timeRatio, 1)); // Не более 15 баллов
+  // 2. Базовый счет за правильные ответы (0-100)
+  const baseScore = (correctTrials / totalTrials) * 100;
   
-  // Множитель точности (процент правильных ответов)
-  const accuracyMultiplier = correctTrials / totalTrials;
+  // 3. Усиление базового счета за счет точности в квадрате
+  const accuracyBoostedScore = baseScore * (accuracy * accuracy);
   
-  // Бонус за раунды (+20% за каждый пройденный раунд)
-  // Для первого раунда множитель равен 1
-  const roundBonus = Math.max(1, 1 + roundsCompleted * 0.2);
+  // 4. Учитываем скорость
+  const theoreticalMinTime = totalTrials * 1500; // 1.5 секунды на пробу
+  const timeRatio = Math.sqrt(theoreticalMinTime / totalTimeMs); // Берем корень для смягчения влияния времени
+  const scoreAfterSpeed = accuracyBoostedScore * Math.min(timeRatio, 1); // Ограничиваем множитель единицей
   
-  // Итоговый рейтинг
-  const finalScore = Math.round(
-    (timeScore + (accuracyMultiplier * 85)) * roundBonus
-  );
+  // 5. Добавляем бонус за номер раунда (+10% за каждый раунд)
+  const roundBonus = 1 + 0.1 * roundsCompleted;
+  const finalScore = Math.round(scoreAfterSpeed * roundBonus);
 
   return {
-    timeScore,
-    accuracyMultiplier,
-    roundBonus,
-    finalScore,
-    theoreticalMinTime,
+    timeScore: Math.round(Math.min(timeRatio, 1) * 15), // Для отображения в карточке (0-15)
+    accuracyMultiplier: accuracy * accuracy, // Для отображения в карточке (квадрат точности)
+    roundBonus: roundBonus, // Множитель за раунды
+    finalScore: finalScore,
+    theoreticalMinTime: theoreticalMinTime,
     actualTime: totalTimeMs,
-    accuracy: (correctTrials / totalTrials) * 100,
-    roundsCompleted
+    accuracy: accuracy * 100, // Для отображения в процентах
+    roundsCompleted: roundsCompleted
   };
 } 

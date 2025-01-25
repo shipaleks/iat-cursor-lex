@@ -115,9 +115,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
             <TableRow>
               <TableCell>Место</TableCell>
               <TableCell>Имя</TableCell>
-              <TableCell align="right">Точность</TableCell>
-              <TableCell align="right">Общее время</TableCell>
-              <TableCell align="right">Баллы</TableCell>
+              <TableCell>Точность</TableCell>
+              <TableCell>Среднее время</TableCell>
+              <TableCell>Счёт</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -134,13 +134,13 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
               >
                 <TableCell>{entry.rank}</TableCell>
                 <TableCell>{entry.nickname}</TableCell>
-                <TableCell align="right">
+                <TableCell>
                   {entry.accuracy.toFixed(1)}%
                 </TableCell>
-                <TableCell align="right">
+                <TableCell>
                   {formatTime(entry.totalTimeMs)}
                 </TableCell>
-                <TableCell align="right">
+                <TableCell>
                   {entry.score.toFixed(0)}
                 </TableCell>
               </TableRow>

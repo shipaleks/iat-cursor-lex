@@ -1,6 +1,6 @@
 antonym	concept	model_name
-луна	полумна	v8_latent_finetune
-луна	полумна	v10_rl_09_lcm_lora_s8r64
+гном	полумна	v8_latent_finetune
+гном	полумна	v10_rl_09_lcm_lora_s8r64
 крыша	фукигаэси	v8_latent_finetune
 волк	олень	v8_latent_finetune
 крыша	фукигаэси	v10_rl_09_lcm_lora_s8r64
@@ -18,7 +18,7 @@ antonym	concept	model_name
 меч	щит	v8_latent_finetune
 шорты	хиджаб	v8_latent_finetune
 пешка	ферзь	v10_rl_09_lcm_lora_s8r64
-клеи	гвозди	v8_latent_finetune
+клей	гвозди	v8_latent_finetune
 трюфель	кукуруза	v8_latent_finetune
 спринтеры	марафонцы	v10_rl_09_lcm_lora_s8r64
 впадины	скулы	v8_latent_finetune
@@ -28,7 +28,7 @@ antonym	concept	model_name
 камень	оригами	v8_latent_finetune
 шорты	хиджаб	v10_rl_09_lcm_lora_s8r64
 камень	винисиус	v8_latent_finetune
-клеи	гвозди	v10_rl_09_lcm_lora_s8r64
+клей	гвозди	v10_rl_09_lcm_lora_s8r64
 плащ	боди	v8_latent_finetune
 подчинённый	начальник	v8_latent_finetune
 трюфель	кукуруза	v10_rl_09_lcm_lora_s8r64
@@ -41,7 +41,7 @@ antonym	concept	model_name
 туфли	кеды	v10_rl_09_lcm_lora_s8r64
 свобода	ошейник	v8_latent_finetune
 человек	дрон	v8_latent_finetune
-жизнь	веном	v8_latent_finetune
+артхаус	веном	v8_latent_finetune
 камень	оригами	v10_rl_09_lcm_lora_s8r64
 лев	мышь	v8_latent_finetune
 разрыв	крест	v8_latent_finetune
@@ -56,7 +56,7 @@ antonym	concept	model_name
 поганки	лютики	v8_latent_finetune
 щит	булава	v8_latent_finetune
 обломки	гирлянда	v10_rl_09_lcm_lora_s8r64
-огнедевочка	снегурочка	v8_latent_finetune
+мальчик	снегурочка	v8_latent_finetune
 пустынник	полярник	v10_rl_09_lcm_lora_s8r64
 миксер	сита	v8_latent_finetune
 океан	пруд	v10_rl_09_lcm_lora_s8r64
@@ -65,7 +65,7 @@ antonym	concept	model_name
 отель	кемпинг	v8_latent_finetune
 человек	дрон	v10_rl_09_lcm_lora_s8r64
 сомбреро	ушанка	v8_latent_finetune
-жизнь	веном	v10_rl_09_lcm_lora_s8r64
+артхаус	веном	v10_rl_09_lcm_lora_s8r64
 лев	мышь	v10_rl_09_lcm_lora_s8r64
 разрыв	крест	v10_rl_09_lcm_lora_s8r64
 ель	пальма	v10_rl_09_lcm_lora_s8r64
@@ -74,7 +74,7 @@ antonym	concept	model_name
 свобода	темница	v10_rl_09_lcm_lora_s8r64
 поганки	лютики	v10_rl_09_lcm_lora_s8r64
 щит	булава	v10_rl_09_lcm_lora_s8r64
-огнедевочка	снегурочка	v10_rl_09_lcm_lora_s8r64
+мальчик	снегурочка	v10_rl_09_lcm_lora_s8r64
 миксер	сита	v10_rl_09_lcm_lora_s8r64
 сова	чайка	v10_rl_09_lcm_lora_s8r64
 отель	кемпинг	v10_rl_09_lcm_lora_s8r64

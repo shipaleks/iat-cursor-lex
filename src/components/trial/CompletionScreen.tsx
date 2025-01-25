@@ -1,155 +1,274 @@
-import { useState, useEffect } from 'react';
-import { Box, Typography, Button, LinearProgress } from '@mui/material';
-import { calculateRating, type RatingCalculation } from '../../firebase/service';
+import React, { useEffect, useState } from 'react';
+import { Box, Typography, Button, Card, CircularProgress, IconButton, Tooltip } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { calculateRating } from '../../firebase/service.tsx';
+import { RatingCalculation } from '../../firebase/service.tsx';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { Leaderboard } from '../leaderboard/Leaderboard';
 
 interface CompletionScreenProps {
-  accuracy: number;
-  totalTimeMs: number;
-  totalTrials: number;
-  correctTrials: number;
-  completedImages: string[];
-  onContinue: () => void;
-  onExit: () => void;
+  participant: {
+    sessionId: string;
+    nickname: string;
+    isTestSession: boolean;
+  };
+  sessionStats: {
+    totalTrials: number;
+    correctTrials: number;
+    totalTimeMs: number;
+  };
+  canContinue: boolean;
+  onStartNewSession: () => void;
+  completedImages?: string[];
 }
 
-export default function CompletionScreen({
-  accuracy,
-  totalTimeMs,
-  totalTrials,
-  correctTrials,
-  completedImages,
-  onContinue,
-  onExit
-}: CompletionScreenProps) {
-  const [ratingDetails, setRatingDetails] = useState<RatingCalculation | null>(null);
-  const [showTimeScore, setShowTimeScore] = useState(false);
-  const [showAccuracyPenalty, setShowAccuracyPenalty] = useState(false);
-  const [showRoundMultiplier, setShowRoundMultiplier] = useState(false);
-  const [currentScore, setCurrentScore] = useState(0);
+export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant, sessionStats, canContinue, onStartNewSession, completedImages }) => {
+  const navigate = useNavigate();
+  const [rating, setRating] = useState<RatingCalculation | null>(null);
 
   useEffect(() => {
-    // Загружаем детали рейтинга
-    const uniqueImagesCount = new Set(completedImages.map(img => img.split('_')[0])).size;
-    const completedRounds = Math.floor(uniqueImagesCount / 4);
-    
-    calculateRating(totalTrials, correctTrials, totalTimeMs, completedRounds).then(details => {
-      setRatingDetails(details);
-      
-      // Анимируем показ компонентов
-      setTimeout(() => {
-        setShowTimeScore(true);
-        setCurrentScore(details.timeScore);
-      }, 1000);
+    const calculateAndShowRating = async () => {
+      try {
+        console.log('Session stats:', sessionStats);
+        const roundsCompleted = completedImages ? Math.floor(completedImages.length / 4) : 0;
+        console.log('Rounds completed:', roundsCompleted);
+        const rating = await calculateRating(
+          sessionStats.totalTrials,
+          sessionStats.correctTrials,
+          sessionStats.totalTimeMs,
+          roundsCompleted
+        );
+        console.log('Calculated rating:', rating);
+        setRating(rating);
+      } catch (error) {
+        console.error('Error calculating rating:', error);
+      }
+    };
 
-      setTimeout(() => {
-        setShowAccuracyPenalty(true);
-        setCurrentScore(Math.round(details.timeScore * details.accuracyMultiplier));
-      }, 3000);
+    calculateAndShowRating();
+  }, [sessionStats, completedImages]);
 
-      setTimeout(() => {
-        setShowRoundMultiplier(true);
-        setCurrentScore(details.finalScore);
-      }, 5000);
-    });
-  }, [totalTrials, correctTrials, totalTimeMs, completedImages]);
+  if (!rating) return null;
+  console.log('Rendering with rating:', rating);
 
-  if (!ratingDetails) {
-    return <Box sx={{ p: 3 }}><LinearProgress /></Box>;
-  }
+  const StatCard = ({ title, icon, score, maxScore, color, description }: { 
+    title: string; 
+    icon: React.ReactNode; 
+    score: number; 
+    maxScore: number;
+    color: string;
+    description: string;
+  }) => (
+    <Card sx={{ 
+      width: { xs: 105, sm: 160 }, 
+      height: { xs: 160, sm: 180 }, 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'flex-start',
+      p: { xs: 1, sm: 2 },
+      pt: { xs: 2, sm: 3 },
+      m: 0.5,
+      position: 'relative'
+    }}>
+      <Box sx={{ position: 'relative', mb: 2, width: { xs: 45, sm: 60 }, height: { xs: 45, sm: 60 }, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress
+          variant="determinate"
+          value={100}
+          size={45}
+          thickness={3}
+          sx={{ color: 'grey.200', position: 'absolute' }}
+        />
+        <CircularProgress
+          variant="determinate"
+          value={title === "Бонус" ? bonusPercent : (isNaN(score) ? 0 : (score / maxScore) * 100)}
+          size={45}
+          thickness={3}
+          sx={{ color, position: 'absolute' }}
+        />
+        <Box sx={{
+          position: 'absolute',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%'
+        }}>
+          {React.cloneElement(icon as React.ReactElement, { 
+            sx: { 
+              fontSize: { xs: 24, sm: 30 },
+              color: (icon as React.ReactElement).props.sx?.color 
+            } 
+          })}
+        </Box>
+      </Box>
+      <Typography variant="subtitle2" align="center" gutterBottom sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' }, mb: 1.5, minHeight: '1rem' }}>
+        {title}
+      </Typography>
+      <Typography variant="h6" align="center" sx={{ color, fontSize: { xs: '1rem', sm: '1.25rem' }, mb: 1.5, minHeight: '1.5rem' }}>
+        {title === "Бонус" ? `×${isNaN(score) ? '0' : score}` : (isNaN(score) ? '0' : score)}
+      </Typography>
+      <Typography 
+        variant="caption" 
+        align="center" 
+        color="text.secondary"
+        sx={{ 
+          whiteSpace: 'pre-line',
+          lineHeight: 1.2,
+          fontSize: { xs: '0.6rem', sm: '0.75rem' },
+          minHeight: '2rem'
+        }}
+      >
+        {description}
+      </Typography>
+    </Card>
+  );
+
+  // Вычисляем максимальный бонус за раунды (20 = 100%)
+  const maxBonusRounds = 20;
+  const bonusScore = Math.round((rating.roundBonus - 1) * 100);
+  const bonusPercent = (rating.roundsCompleted / maxBonusRounds) * 100;
 
   return (
-    <Box sx={{
+    <Box sx={{ 
+      height: '100dvh',
       display: 'flex',
       flexDirection: 'column',
-      gap: 3,
-      p: 3,
-      bgcolor: 'grey.100'
+      bgcolor: 'grey.100',
+      p: { xs: 2, sm: 3 }
     }}>
-      <Typography variant="h5" align="center">
+      <Typography variant="h5" gutterBottom align="center">
         Результаты раунда
       </Typography>
 
-      <Typography variant="h4" align="center" sx={{ 
-        transition: 'all 0.5s ease-in-out',
-        color: showRoundMultiplier ? 'success.main' : 'text.primary'
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 1,
+        my: 2,
+        flexWrap: 'nowrap'
       }}>
-        {currentScore}
+        <StatCard
+          title="Время"
+          icon={<AccessTimeIcon sx={{ fontSize: 30, color: 'primary.main' }} />}
+          score={rating.timeScore}
+          maxScore={15}
+          color="primary.main"
+          description={`из 15 баллов\n${Math.round(rating.actualTime / 1000)}с / ${Math.round(rating.theoreticalMinTime / 1000)}с`}
+        />
+        <StatCard
+          title="Точность"
+          icon={<CheckCircleIcon sx={{ fontSize: 30, color: 'success.main' }} />}
+          score={Math.round(rating.accuracyMultiplier * 85)}
+          maxScore={85}
+          color="success.main"
+          description={`из 85 баллов\n${Math.round(rating.accuracy)}% верных ответов`}
+        />
+        <StatCard
+          title="Бонус"
+          icon={<EmojiEventsIcon sx={{ fontSize: 30, color: 'warning.main' }} />}
+          score={Math.round(rating.roundBonus * 100) / 100}
+          maxScore={4}
+          color="warning.main"
+          description={`за ${rating.roundsCompleted} из ${maxBonusRounds} раундов\n(+10% за раунд)`}
+        />
+      </Box>
+
+      <Typography variant="h4" align="center" sx={{ my: 3 }}>
+        Счёт за раунд: {isNaN(rating.finalScore) ? '0' : rating.finalScore}
       </Typography>
 
-      {showTimeScore && (
-        <Box>
-          <Typography variant="subtitle1">
-            1. Скорость реакции
-          </Typography>
-          <Box sx={{ mt: 1, mb: 2 }}>
-            <LinearProgress
-              variant="determinate"
-              value={(ratingDetails.actualTime / ratingDetails.theoreticalMinTime) * 100}
-              sx={{
-                height: 10,
-                bgcolor: 'grey.300',
-                '& .MuiLinearProgress-bar': {
-                  bgcolor: 'primary.main'
-                }
-              }}
-            />
+      {!participant.isTestSession && (
+        <>
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+              <Typography variant="body1" color="text.secondary">
+                Рейтинг игроков
+              </Typography>
+              <Tooltip title={
+                <Box sx={{ p: 1 }}>
+                  <Typography variant="body2">
+                    Как считается счёт за раунд:
+                    <br/><br/>
+                    • <b>Точность</b> (до 85 баллов)
+                    <br/>Процент верных ответов влияет на счёт в квадрате. 
+                    <br/>Пример: 90% = 0.9² × 85 ≈ 69 баллов
+                    <br/><br/>
+                    • <b>Время</b> (до 15 баллов)
+                    <br/>Чем ближе к оптимальному времени (1.5с на слово), тем больше баллов
+                    <br/><br/>
+                    • <b>Бонус за раунды</b>
+                    <br/>Увеличивает итоговый счёт на 10% за каждый пройденный раунд:
+                    <br/>1 раунд: ×1.1, 2 раунда: ×1.2, 3 раунда: ×1.3 и т.д.
+                    <br/><br/>
+                    • <b>Рейтинг в таблице</b>
+                    <br/>В таблице лидеров показан средний счёт по всем вашим раундам
+                  </Typography>
+                </Box>
+              }>
+                <HelpOutlineIcon 
+                  sx={{ 
+                    fontSize: 20,
+                    color: 'text.secondary',
+                    cursor: 'help'
+                  }} 
+                />
+              </Tooltip>
+            </Box>
+            <Typography variant="body2" color="text.secondary">
+              Ваш результат за этот раунд повлияет на среднее значение в таблице рейтинга
+            </Typography>
           </Box>
-          <Typography>
-            Базовый балл: {ratingDetails.timeScore}
-          </Typography>
-        </Box>
+
+          <Leaderboard 
+            currentUserNickname={participant.nickname} 
+            sx={{
+              '.current-user': {
+                bgcolor: 'primary.light',
+                color: 'primary.contrastText'
+              }
+            }}
+          />
+        </>
       )}
 
-      {showAccuracyPenalty && (
-        <Box>
-          <Typography variant="subtitle1">
-            2. Штраф за ошибки
-          </Typography>
-          <Typography>
-            Точность: {ratingDetails.accuracy.toFixed(1)}%
-          </Typography>
-          <Typography sx={{ color: ratingDetails.accuracyMultiplier < 1 ? 'error.main' : 'success.main' }}>
-            Множитель: ×{ratingDetails.accuracyMultiplier.toFixed(2)}
-          </Typography>
-          <Typography>
-            Балл после штрафа: {Math.round(ratingDetails.timeScore * ratingDetails.accuracyMultiplier)}
-          </Typography>
-        </Box>
+      {!canContinue && !participant.isTestSession && (
+        <Typography sx={{ mt: 2, color: 'success.main' }}>
+          Поздравляем! Вы прошли все раунды. Теперь можно начать новую игру с теми же изображениями.
+        </Typography>
       )}
 
-      {showRoundMultiplier && (
-        <Box>
-          <Typography variant="subtitle1">
-            3. Множитель за раунды
-          </Typography>
-          <Typography>
-            Пройдено раундов: {Math.floor(new Set(completedImages.map(img => img.split('_')[0])).size / 4)}
-          </Typography>
-          <Typography sx={{ color: 'success.main' }}>
-            Множитель: ×{ratingDetails.roundBonus.toFixed(2)}
-          </Typography>
-          <Typography variant="subtitle1" sx={{ mt: 1 }}>
-            Следующий раунд: ×{(ratingDetails.roundBonus + 0.2).toFixed(2)}
-          </Typography>
-        </Box>
-      )}
-
-      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 2 }}>
-        <Button
-          variant="contained"
-          onClick={onContinue}
-          sx={{ minWidth: 120 }}
-        >
-          Ещё раунд?
-        </Button>
+      <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {canContinue && (
+          <>
+            <Typography variant="body2" color="text.secondary">
+              Пройдено раундов: {completedImages ? Math.floor(completedImages.length / 4) : 0} из 20
+            </Typography>
+            <Button
+              variant="contained"
+              fullWidth
+              size="large"
+              onClick={onStartNewSession}
+              sx={{ boxShadow: 0 }}
+            >
+              Новый раунд
+            </Button>
+          </>
+        )}
         <Button
           variant="outlined"
-          onClick={onExit}
-          sx={{ minWidth: 120 }}
+          fullWidth
+          size="large"
+          onClick={() => navigate('/')}
         >
-          В начало
+          {canContinue ? 'Выйти из игры' : 'В начало'}
         </Button>
       </Box>
     </Box>
   );
-} 
+}; 

@@ -6,7 +6,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { NicknameForm } from './components/auth/NicknameForm';
 import { Instructions } from './components/auth/Instructions';
 import { ExperimentScreen } from './components/trial/ExperimentScreen';
-import { CompletionScreen } from './components/CompletionScreen';
+import { CompletionScreen } from './components/trial/CompletionScreen';
 import { DataExport } from './components/admin/DataExport';
 import { Participant } from './types';
 import { ExperimentStats } from './types';

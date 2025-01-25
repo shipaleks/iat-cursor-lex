@@ -105,7 +105,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
 
     setLastResponse({
       isCorrect: isCorrect,
-      button: isWord ? 'left' : 'right'
+      button: isWord ? 'right' : 'left'
     });
     if (isCorrect) {
       setCorrectAnswers(prev => prev + 1);
@@ -208,9 +208,9 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   // Обработка нажатий клавиш
   const handleKeyPress = useCallback((event: KeyboardEvent) => {
     if (event.key === 'ArrowLeft') {
-      handleResponse(true); // СЛОВО
-    } else if (event.key === 'ArrowRight') {
       handleResponse(false); // НЕ СЛОВО
+    } else if (event.key === 'ArrowRight') {
+      handleResponse(true); // СЛОВО
     }
   }, [handleResponse]);
 
@@ -396,7 +396,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           variant="outlined"
           fullWidth
           startIcon={<KeyboardArrowLeft />}
-          onClick={() => handleResponse(true)}
+          onClick={() => handleResponse(false)}
           sx={{
             height: { xs: 56, sm: 'auto' },
             color: lastResponse?.button === 'left' 
@@ -417,13 +417,13 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
             }
           }}
         >
-          Слово
+          Не слово
         </Button>
         <Button
           variant="outlined"
           fullWidth
           endIcon={<KeyboardArrowRight />}
-          onClick={() => handleResponse(false)}
+          onClick={() => handleResponse(true)}
           sx={{
             height: { xs: 56, sm: 'auto' },
             color: lastResponse?.button === 'right'
@@ -444,7 +444,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
             }
           }}
         >
-          Не слово
+          Слово
         </Button>
       </Box>
     </Box>
