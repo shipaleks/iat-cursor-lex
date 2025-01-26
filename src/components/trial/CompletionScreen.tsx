@@ -123,7 +123,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         }}
       >
         {title === "Бонус" ? 
-          `за ${rating.roundsCompleted} из ${maxBonusRounds} раундов\n(+10% за раунд = ×${Math.round(rating.roundBonus * 100)}%)` : 
+          `за ${rating.roundsCompleted} из ${maxBonusRounds} раундов\n(+10% за раунд)` : 
           description}
       </Typography>
     </Card>
