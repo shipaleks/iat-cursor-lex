@@ -21,11 +21,11 @@ interface CompletionScreenProps {
     totalTimeMs: number;
   };
   canContinue: boolean;
-  onStartNewSession: () => void;
+  onNextRound: () => void;
   completedImages?: string[];
 }
 
-export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant, sessionStats, canContinue, onStartNewSession, completedImages }) => {
+export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant, sessionStats, canContinue, onNextRound, completedImages }) => {
   const navigate = useNavigate();
   const [rating, setRating] = useState<RatingCalculation | null>(null);
 
@@ -109,7 +109,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         {title}
       </Typography>
       <Typography variant="h6" align="center" sx={{ color, fontSize: { xs: '1rem', sm: '1.25rem' }, mb: 1.5, minHeight: '1.5rem' }}>
-        {title === "Бонус" ? `×${isNaN(score) ? '0' : score}` : (isNaN(score) ? '0' : score)}
+        {title === "Бонус" ? `×${isNaN(score) ? '0' : Math.round(score * 100)}%` : (isNaN(score) ? '0' : score)}
       </Typography>
       <Typography 
         variant="caption" 
@@ -122,7 +122,9 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
           minHeight: '2rem'
         }}
       >
-        {description}
+        {title === "Бонус" ? 
+          `за ${rating.roundsCompleted} из ${maxBonusRounds} раундов\n(+10% за раунд = ×${Math.round(rating.roundBonus * 100)}%)` : 
+          description}
       </Typography>
     </Card>
   );
@@ -183,6 +185,25 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         Счёт за раунд: {isNaN(rating.finalScore) ? '0' : rating.finalScore}
       </Typography>
 
+      {canContinue && (
+        <>
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 1 }}>
+            Пройдено раундов: {completedImages ? Math.floor(completedImages.length / 4) : 0} из 20
+          </Typography>
+          <Typography variant="body1" color="primary" align="center" sx={{ mb: 2 }}>
+            Продолжайте играть, чтобы улучшить свой рейтинг! Каждый новый раунд увеличивает ваш бонус ещё на 10%
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={onNextRound}
+            fullWidth
+            sx={{ mb: 3 }}
+          >
+            Играть ещё
+          </Button>
+        </>
+      )}
+
       {!participant.isTestSession && (
         <>
           <Box sx={{ mb: 2 }}>
@@ -237,36 +258,18 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         </>
       )}
 
-      {!canContinue && !participant.isTestSession && (
-        <Typography sx={{ mt: 2, color: 'success.main' }}>
-          Поздравляем! Вы прошли все раунды. Теперь можно начать новую игру с теми же изображениями.
-        </Typography>
-      )}
-
       <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {canContinue && (
-          <>
-            <Typography variant="body2" color="text.secondary">
-              Пройдено раундов: {completedImages ? Math.floor(completedImages.length / 4) : 0} из 20
-            </Typography>
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              onClick={onStartNewSession}
-              sx={{ boxShadow: 0 }}
-            >
-              Новый раунд
-            </Button>
-          </>
+        {!canContinue && !participant.isTestSession && (
+          <Typography sx={{ mt: 2, color: 'success.main' }}>
+            Поздравляем! Вы прошли все раунды. Теперь можно начать новую игру с теми же изображениями.
+          </Typography>
         )}
         <Button
           variant="outlined"
-          fullWidth
-          size="large"
           onClick={() => navigate('/')}
+          fullWidth
         >
-          {canContinue ? 'Выйти из игры' : 'В начало'}
+          В начало
         </Button>
       </Box>
     </Box>

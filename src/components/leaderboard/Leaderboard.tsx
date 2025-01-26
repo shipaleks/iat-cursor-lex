@@ -17,6 +17,12 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { getLeaderboard } from '../../firebase/service.tsx';
 
+// Функция маскировки никнейма
+const maskNickname = (nickname: string): string => {
+  if (!nickname || nickname.length <= 3) return nickname;
+  return `${nickname.slice(0, 2)}${'*'.repeat(3)}${nickname.slice(-1)}`;
+};
+
 export interface LeaderboardEntry {
   nickname: string;
   accuracy: number;
@@ -92,12 +98,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
   return (
     <Box sx={{ width: '100%', mb: 4, ...sx }}>
       <Typography variant="h5" gutterBottom align="center">
-        Таблица лидеров
+        Лидерборд
       </Typography>
 
       {currentUser && !isCurrentUserInTop5 && !showAll && (
-        <Box sx={{ mb: 2, p: 2, bgcolor: 'primary.light', borderRadius: 1 }}>
-          <Typography variant="body2" align="center">
+        <Box sx={{ mb: 2, p: 2, bgcolor: 'primary.main', borderRadius: 1 }}>
+          <Typography variant="body2" align="center" sx={{ color: 'white' }}>
             Ваша позиция: {currentUser.rank} место
           </Typography>
         </Box>
@@ -121,7 +127,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
             </TableRow>
           </TableHead>
           <TableBody>
-            {displayedEntries.map((entry, index) => (
+            {displayedEntries.map((entry) => (
               <TableRow 
                 key={entry.nickname} 
                 sx={{ 
@@ -133,7 +139,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
                 }}
               >
                 <TableCell>{entry.rank}</TableCell>
-                <TableCell>{entry.nickname}</TableCell>
+                <TableCell>
+                  {entry.nickname === currentUserNickname ? entry.nickname : maskNickname(entry.nickname)}
+                </TableCell>
                 <TableCell>
                   {entry.accuracy.toFixed(1)}%
                 </TableCell>

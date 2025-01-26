@@ -49,25 +49,7 @@ export interface RatingCalculation {
 // Выход из системы
 export async function signOutUser() {
   try {
-    const db = getFirestore();
     const auth = getAuth();
-    const currentUser = auth.currentUser;
-
-    if (currentUser) {
-      // Очищаем запись в коллекции nicknames для текущего пользователя
-      const nicknamesRef = collection(db, 'nicknames');
-      const nicknameQuery = query(nicknamesRef, where('userId', '==', currentUser.uid));
-      const nicknameSnapshot = await getDocs(nicknameQuery);
-      
-      for (const doc of nicknameSnapshot.docs) {
-        await deleteDoc(doc.ref);
-      }
-
-      // Очищаем прогресс пользователя
-      const progressRef = doc(db, 'progress', currentUser.uid);
-      await deleteDoc(progressRef);
-    }
-
     await signOut(auth);
     console.log('User signed out successfully');
   } catch (error) {
@@ -75,15 +57,12 @@ export async function signOutUser() {
   }
 }
 
-// Анонимная аутентификация с предварительным выходом
+// Анонимная аутентификация
 export async function signInAnonymousUser() {
   const auth = getAuth();
   
   try {
-    // Сначала выходим из текущей сессии
-    await signOutUser();
-    
-    // Затем создаем новую анонимную сессию
+    // Создаем новую анонимную сессию
     const result = await signInAnonymously(auth);
     console.log('New anonymous user created with UID:', result.user.uid);
     return result.user;
@@ -117,10 +96,23 @@ export const getParticipantProgressByNickname = async (nickname: string): Promis
             completedImages: Array.isArray(progress.completedImages) ? progress.completedImages : []
           }
         };
+      } else {
+        // Если нашли никнейм, но нет прогресса, создаем новый
+        const newProgress: ParticipantProgress = {
+          nickname,
+          completedImages: [],
+          totalSessions: 0,
+          lastSessionTimestamp: new Date()
+        };
+        await setDoc(doc(db, 'progress', userId), newProgress);
+        return {
+          userId,
+          progress: newProgress
+        };
       }
     }
     
-    // Если не нашли в nicknames или нет прогресса, возвращаем null
+    // Если не нашли в nicknames, возвращаем null
     console.log('No progress found for nickname:', nickname);
     return null;
   } catch (error) {
@@ -163,16 +155,22 @@ export const updateParticipantProgress = async (
   completedImages: string[]
 ): Promise<void> => {
   try {
-    // Проверяем, существует ли никнейм
-    const nicknameDoc = await getDoc(doc(db, 'nicknames', participantNickname));
+    console.log('Updating progress for:', {
+      participantId,
+      participantNickname,
+      newCompletedImages: completedImages.length
+    });
+
+    // Проверяем существующий прогресс по никнейму
+    const existingProgress = await getParticipantProgressByNickname(participantNickname);
     
-    if (nicknameDoc.exists()) {
-      const existingUserId = nicknameDoc.data().userId;
-      // Если никнейм уже занят другим пользователем, выбрасываем ошибку
-      if (existingUserId !== participantId) {
-        throw new Error('Nickname is already taken by another user');
-      }
-      // Если это тот же пользователь, продолжаем обновление
+    // Если есть существующий прогресс, используем его completedImages
+    let allCompletedImages = completedImages;
+    if (existingProgress) {
+      console.log('Found existing progress:', existingProgress);
+      // Объединяем существующие и новые изображения
+      allCompletedImages = [...new Set([...existingProgress.progress.completedImages, ...completedImages])];
+      console.log('Combined completed images:', allCompletedImages.length);
     }
 
     // Обновляем или создаем запись в коллекции nicknames
@@ -183,22 +181,24 @@ export const updateParticipantProgress = async (
 
     // Обновляем прогресс участника
     const progressRef = doc(db, 'progress', participantId);
-    const progressDoc = await getDoc(progressRef);
+    
+    // Получаем текущий прогресс для корректного подсчета сессий
+    const currentProgress = await getDoc(progressRef);
+    const currentTotalSessions = currentProgress.exists() ? 
+      (currentProgress.data().totalSessions || 0) : 0;
 
-    if (progressDoc.exists()) {
-      // Обновляем существующий прогресс
-      await updateDoc(progressRef, {
-        completedImages: completedImages,
-        lastUpdated: serverTimestamp()
-      });
-    } else {
-      // Создаем новый документ прогресса
-      await setDoc(progressRef, {
-        completedImages: completedImages,
-        createdAt: serverTimestamp(),
-        lastUpdated: serverTimestamp()
-      });
-    }
+    await setDoc(progressRef, {
+      nickname: participantNickname,
+      completedImages: allCompletedImages,
+      totalSessions: currentTotalSessions + 1,
+      lastSessionTimestamp: serverTimestamp()
+    });
+
+    console.log('Progress updated:', {
+      totalImages: allCompletedImages.length,
+      rounds: Math.floor(allCompletedImages.length / 4),
+      totalSessions: currentTotalSessions + 1
+    });
   } catch (error) {
     console.error('Error updating participant progress:', error);
     throw error;
@@ -282,15 +282,15 @@ export const updateLeaderboard = async (
   totalTimeMs: number
 ) => {
   try {
-    // Получаем все сессии пользователя
+    // Получаем все сессии пользователя по никнейму
     const sessionsQuery = query(
       collection(db, 'sessions'),
-      where('participantId', '==', participantId)
+      where('nickname', '==', nickname)
     );
     const sessionsSnapshot = await getDocs(sessionsQuery);
     const sessions = sessionsSnapshot.docs.map(doc => doc.data());
 
-    // Считаем среднее время и общую точность
+    // Считаем среднее время и общую точность по всем сессиям
     const totalSessions = sessions.length;
     const totalAccuracy = sessions.reduce((sum, session) => sum + (session.correctTrials / session.totalTrials), 0);
     const averageTimeMs = sessions.reduce((sum, session) => sum + session.totalTimeMs, 0) / totalSessions;
@@ -299,11 +299,19 @@ export const updateLeaderboard = async (
     const progress = await getParticipantProgress(participantId);
     const completedRounds = progress ? Math.floor((progress.completedImages || []).length / 4) : 0;
 
+    console.log('Updating leaderboard for:', {
+      nickname,
+      totalSessions,
+      completedRounds,
+      progress: progress?.completedImages?.length || 0,
+      averageTimeMs
+    });
+
     // Рассчитываем рейтинг
     const rating = await calculateRating(
       totalTrials,
       correctTrials,
-      averageTimeMs, // Используем среднее время вместо времени последней сессии
+      averageTimeMs,
       completedRounds
     );
 
@@ -311,6 +319,7 @@ export const updateLeaderboard = async (
     const leaderboardRef = doc(db, 'leaderboard', nickname);
     await setDoc(leaderboardRef, {
       nickname,
+      participantId, // Добавляем participantId для связи с прогрессом
       accuracy: (totalAccuracy / totalSessions) * 100,
       totalTimeMs: averageTimeMs,
       score: rating.finalScore,
@@ -357,34 +366,68 @@ export const recalculateLeaderboardScores = async () => {
   try {
     const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
 
-    for (const doc of leaderboardSnapshot.docs) {
-      const data = doc.data();
-      const accuracy = (data.totalCorrect / data.totalTrials) * 100;
-      const timeInMinutes = data.totalTime / (1000 * 60);
+    for (const docRef of leaderboardSnapshot.docs) {
+      const data = docRef.data();
+      
+      // Получаем сессии пользователя
+      const sessionsQuery = query(
+        collection(db, 'sessions'),
+        where('nickname', '==', data.nickname)
+      );
+      const sessionsSnapshot = await getDocs(sessionsQuery);
+      const sessions = sessionsSnapshot.docs.map(doc => doc.data());
 
-      let accuracyScore;
-      if (accuracy < 80) {
-        // Ниже 80% - экспоненциальное снижение
-        accuracyScore = Math.pow(accuracy / 80, 4) * 30;
-      } else if (accuracy < 95) {
-        // От 80% до 95% - линейный рост
-        accuracyScore = 30 + (accuracy - 80) * (35 / 15);
-      } else {
-        // Выше 95% - бонус за высокую точность
-        accuracyScore = 65 + Math.min(20, Math.pow(1.3, accuracy - 95));
+      if (sessions.length === 0) {
+        console.warn(`No sessions found for ${data.nickname}, skipping recalculation`);
+        continue;
       }
 
-      // Оптимальное время - 5 минут
-      const optimalTime = 5;
-      const timeScore = Math.max(0, 15 * (1 - Math.pow((timeInMinutes - optimalTime) / 8, 2)));
-      const score = Math.round(accuracyScore + timeScore);
+      // Считаем общую статистику по всем сессиям
+      const totalSessions = sessions.length;
+      const totalTrials = sessions.reduce((sum, session) => sum + (session.totalTrials || 0), 0);
+      const correctTrials = sessions.reduce((sum, session) => sum + (session.correctTrials || 0), 0);
+      const totalTimeMs = sessions.reduce((sum, session) => sum + (session.totalTimeMs || 0), 0);
+      const averageTimeMs = totalTimeMs / totalSessions;
 
-      await updateDoc(doc.ref, { score });
+      // Получаем прогресс участника для подсчета раундов
+      const nicknameDocRef = doc(db, 'nicknames', data.nickname);
+      const nicknameDoc = await getDoc(nicknameDocRef);
+      const userId = nicknameDoc.exists() ? nicknameDoc.data().userId : null;
+      
+      let completedRounds = 0;
+      if (userId) {
+        const progress = await getParticipantProgress(userId);
+        completedRounds = progress ? Math.floor((progress.completedImages || []).length / 4) : 0;
+      }
+
+      // Рассчитываем рейтинг
+      const rating = await calculateRating(
+        totalTrials,
+        correctTrials,
+        averageTimeMs,
+        completedRounds
+      );
+
+      // Обновляем запись в лидерборде
+      if (!isNaN(rating.finalScore)) {
+        await updateDoc(docRef.ref, {
+          score: rating.finalScore,
+          accuracy: rating.accuracy,
+          totalTimeMs: averageTimeMs,
+          ratingDetails: rating,
+          roundsCompleted: completedRounds,
+          lastUpdated: serverTimestamp()
+        });
+        console.log(`Updated score for ${data.nickname}: ${rating.finalScore}`);
+      } else {
+        console.warn(`Invalid rating calculated for ${data.nickname}`);
+      }
     }
 
     console.log('Leaderboard scores recalculated successfully.');
   } catch (error) {
     console.error('Error recalculating leaderboard scores:', error);
+    throw error;
   }
 };
 
@@ -450,34 +493,48 @@ export const clearAllData = async () => {
   }
 };
 
-// Расчет рейтинга
+// Расчет рейтинга с дополнительными проверками
 export async function calculateRating(
   totalTrials: number,
   correctTrials: number,
   totalTimeMs: number,
   roundsCompleted: number
 ): Promise<RatingCalculation> {
+  // Проверяем входные данные
+  if (totalTrials <= 0 || totalTimeMs <= 0) {
+    return {
+      timeScore: 0,
+      accuracyMultiplier: 0,
+      roundBonus: 1,
+      finalScore: 0,
+      theoreticalMinTime: 0,
+      actualTime: totalTimeMs,
+      accuracy: 0,
+      roundsCompleted: 0
+    };
+  }
+
   // 1. Вычисляем точность (0-1)
-  const accuracy = correctTrials / totalTrials;
+  const accuracy = totalTrials > 0 ? correctTrials / totalTrials : 0;
   
-  // 2. Базовый счет за правильные ответы (0-100)
-  const baseScore = (correctTrials / totalTrials) * 100;
+  // 2. Очки за точность (до 85 баллов)
+  const accuracyScore = accuracy * accuracy * 85;
   
-  // 3. Усиление базового счета за счет точности в квадрате
-  const accuracyBoostedScore = baseScore * (accuracy * accuracy);
-  
-  // 4. Учитываем скорость
+  // 3. Очки за время (до 15 баллов)
   const theoreticalMinTime = totalTrials * 1500; // 1.5 секунды на пробу
-  const timeRatio = Math.sqrt(theoreticalMinTime / totalTimeMs); // Берем корень для смягчения влияния времени
-  const scoreAfterSpeed = accuracyBoostedScore * Math.min(timeRatio, 1); // Ограничиваем множитель единицей
+  const timeRatio = Math.min(theoreticalMinTime / totalTimeMs, 1); // Ограничиваем максимальное значение
+  const timeScore = timeRatio * 15;
+  
+  // 4. Суммируем базовые очки
+  const baseScore = accuracyScore + timeScore;
   
   // 5. Добавляем бонус за номер раунда (+10% за каждый раунд)
-  const roundBonus = 1 + 0.1 * roundsCompleted;
-  const finalScore = Math.round(scoreAfterSpeed * roundBonus);
+  const roundBonus = 1 + Math.max(0, 0.1 * roundsCompleted);
+  const finalScore = Math.round(baseScore * roundBonus);
 
   return {
-    timeScore: Math.round(Math.min(timeRatio, 1) * 15), // Для отображения в карточке (0-15)
-    accuracyMultiplier: accuracy * accuracy, // Для отображения в карточке (квадрат точности)
+    timeScore: Math.round(timeScore), // 0-15 баллов за время
+    accuracyMultiplier: accuracy * accuracy, // Для расчёта очков за точность
     roundBonus: roundBonus, // Множитель за раунды
     finalScore: finalScore,
     theoreticalMinTime: theoreticalMinTime,

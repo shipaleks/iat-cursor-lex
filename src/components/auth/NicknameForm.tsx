@@ -4,6 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { getParticipantProgressByNickname, getLeaderboard } from '../../firebase/service.tsx';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
+// Функция маскировки никнейма
+const maskNickname = (nickname: string): string => {
+  if (!nickname || nickname.length <= 3) return nickname;
+  return `${nickname.slice(0, 2)}${'*'.repeat(3)}${nickname.slice(-1)}`;
+};
+
 interface NicknameFormProps {
   onSubmit: (nickname: string, isTestSession: boolean, existingUserId?: string) => void;
 }
@@ -31,18 +37,14 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
       // Проверяем, существует ли участник с таким никнеймом
       const existingParticipant = await getParticipantProgressByNickname(nickname.trim());
       
-      if (existingParticipant) {
-        if (isTestSession) {
-          setError('Этот никнейм уже используется. Для тестовой сессии, пожалуйста, выберите другой никнейм.');
-        } else {
-          setError('Этот никнейм уже используется. Если это вы, пожалуйста, продолжите игру на том устройстве, где вы её начали, или используйте другой никнейм.');
-        }
+      if (existingParticipant && isTestSession) {
+        setError('Для тестовой сессии, пожалуйста, выберите другой никнейм.');
         setLoading(false);
         return;
       }
 
-      // Если это новый никнейм
-      await onSubmit(nickname.trim(), isTestSession);
+      // Передаем existingUserId, если он есть
+      await onSubmit(nickname.trim(), isTestSession, existingParticipant?.userId);
       navigate('/instructions');
     } catch (error) {
       console.error('Error checking nickname:', error);
@@ -147,7 +149,7 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
               {leaderboardData.map((entry, index) => (
                 <TableRow key={entry.nickname}>
                   <TableCell>{index + 1}</TableCell>
-                  <TableCell>{entry.nickname}</TableCell>
+                  <TableCell>{maskNickname(entry.nickname)}</TableCell>
                   <TableCell align="right">{entry.accuracy.toFixed(1)}%</TableCell>
                   <TableCell align="right">
                     {Math.floor(entry.totalTimeMs / (1000 * 60))}:

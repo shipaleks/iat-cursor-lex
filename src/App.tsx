@@ -14,6 +14,8 @@ import { signInAnonymousUser, getParticipantProgress, getParticipantProgressByNi
 import { auth } from './firebase/config.tsx';
 import { User } from 'firebase/auth';
 import { IMAGES } from './utils/trialGenerator';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from './firebase/config.tsx';
 
 const theme = createTheme({
   palette: {
@@ -64,24 +66,67 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleNicknameSubmit = async (nickname: string, isTestSession: boolean, existingUserId?: string) => {
+  const handleNicknameSubmit = async (nickname: string, isTestSession: boolean) => {
     try {
-      // Сначала выполняем анонимный вход для получения нового userId
+      // Проверяем, существует ли уже такой никнейм
+      const existingProgress = await getParticipantProgressByNickname(nickname);
+      
+      // Создаем новую анонимную сессию
       const newUser = await signInAnonymousUser();
-      if (newUser) {
-        // Для нового пользователя или тестовой сессии начинаем с пустого прогресса
+      if (!newUser) {
+        throw new Error('Failed to create anonymous user');
+      }
+
+      if (existingProgress) {
+        console.log('Found existing progress:', existingProgress);
+        // Обновляем запись в nicknames с новым userId
+        await setDoc(doc(db, 'nicknames', nickname), {
+          userId: newUser.uid,
+          lastUpdated: serverTimestamp()
+        });
+
+        // Копируем существующий прогресс для нового userId
+        await setDoc(doc(db, 'progress', newUser.uid), {
+          nickname,
+          completedImages: existingProgress.progress.completedImages || [],
+          totalSessions: existingProgress.progress.totalSessions || 0,
+          lastSessionTimestamp: serverTimestamp()
+        });
+
+        // Устанавливаем completedImages из существующего прогресса
+        setCompletedImages(existingProgress.progress.completedImages || []);
+        console.log('Restored progress:', {
+          completedImages: existingProgress.progress.completedImages?.length || 0,
+          rounds: Math.floor((existingProgress.progress.completedImages?.length || 0) / 4)
+        });
+      } else {
+        // Для нового пользователя начинаем с пустого прогресса
         setCompletedImages([]);
         
-        // Создаем нового участника
-        setParticipant({
-          nickname,
-          sessionId: crypto.randomUUID(),
-          isTestSession,
-          startTime: new Date()
-        } as Participant);
+        // Создаем запись в nicknames
+        await setDoc(doc(db, 'nicknames', nickname), {
+          userId: newUser.uid,
+          lastUpdated: serverTimestamp()
+        });
 
-        navigate('/instructions');
+        // Создаем новый прогресс
+        await setDoc(doc(db, 'progress', newUser.uid), {
+          nickname,
+          completedImages: [],
+          totalSessions: 0,
+          lastSessionTimestamp: serverTimestamp()
+        });
       }
+      
+      // Создаем нового участника
+      setParticipant({
+        nickname,
+        sessionId: crypto.randomUUID(),
+        isTestSession,
+        startTime: new Date()
+      } as Participant);
+
+      navigate('/instructions');
     } catch (error) {
       console.error('Error in handleNicknameSubmit:', error);
     }
