@@ -328,7 +328,7 @@ const App = () => {
                       totalTimeMs: experimentStats.totalTimeMs
                     }}
                     canContinue={canContinue}
-                    onStartNewSession={handleStartNewSession}
+                    onNextRound={handleStartNewSession}
                     completedImages={completedImages}
                   />
                 ) : (
