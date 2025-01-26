@@ -296,14 +296,22 @@ export const updateLeaderboard = async (
     const averageTimeMs = sessions.reduce((sum, session) => sum + session.totalTimeMs, 0) / totalSessions;
 
     // Получаем прогресс участника для подсчета раундов
-    const progress = await getParticipantProgress(participantId);
-    const completedRounds = progress ? Math.floor((progress.completedImages || []).length / 4) : 0;
+    const existingProgress = await getParticipantProgressByNickname(nickname);
+    const completedImages = existingProgress?.progress.completedImages || [];
+    
+    // Если это новый раунд, добавляем текущие изображения
+    const currentRoundImages = sessions[sessions.length - 1]?.completedImages || [];
+    const allCompletedImages = [...new Set([...completedImages, ...currentRoundImages])];
+    
+    const completedRounds = Math.max(1, Math.floor(allCompletedImages.length / 4));
 
     console.log('Updating leaderboard for:', {
       nickname,
       totalSessions,
       completedRounds,
-      progress: progress?.completedImages?.length || 0,
+      totalImages: allCompletedImages.length,
+      currentRoundImages: currentRoundImages.length,
+      existingImages: completedImages.length,
       averageTimeMs
     });
 
@@ -390,15 +398,14 @@ export const recalculateLeaderboardScores = async () => {
       const averageTimeMs = totalTimeMs / totalSessions;
 
       // Получаем прогресс участника для подсчета раундов
-      const nicknameDocRef = doc(db, 'nicknames', data.nickname);
-      const nicknameDoc = await getDoc(nicknameDocRef);
-      const userId = nicknameDoc.exists() ? nicknameDoc.data().userId : null;
+      const existingProgress = await getParticipantProgressByNickname(data.nickname);
+      const completedImages = existingProgress?.progress.completedImages || [];
       
-      let completedRounds = 0;
-      if (userId) {
-        const progress = await getParticipantProgress(userId);
-        completedRounds = progress ? Math.floor((progress.completedImages || []).length / 4) : 0;
-      }
+      // Если есть сессии, учитываем изображения из последней сессии
+      const currentRoundImages = sessions[sessions.length - 1]?.completedImages || [];
+      const allCompletedImages = [...new Set([...completedImages, ...currentRoundImages])];
+      
+      const completedRounds = Math.max(1, Math.floor(allCompletedImages.length / 4));
 
       // Рассчитываем рейтинг
       const rating = await calculateRating(

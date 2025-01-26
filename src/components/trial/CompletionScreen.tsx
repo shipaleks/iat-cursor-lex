@@ -204,6 +204,22 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         </>
       )}
 
+      {!canContinue && !participant.isTestSession && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, my: 3 }}>
+          <Typography variant="h6" color="success.main" align="center">
+            Поздравляем! Вы успешно завершили все раунды! 🎉
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate('/explanation')}
+            sx={{ minWidth: 250 }}
+          >
+            Узнать больше об эксперименте
+          </Button>
+        </Box>
+      )}
+
       {!participant.isTestSession && (
         <>
           <Box sx={{ mb: 2 }}>

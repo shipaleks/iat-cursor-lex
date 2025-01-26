@@ -16,6 +16,7 @@ import { User } from 'firebase/auth';
 import { IMAGES } from './utils/trialGenerator';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase/config.tsx';
+import { ExperimentExplanation } from './components/trial/ExperimentExplanation';
 
 const theme = createTheme({
   palette: {
@@ -68,6 +69,8 @@ const App = () => {
 
   const handleNicknameSubmit = async (nickname: string, isTestSession: boolean) => {
     try {
+      setLoading(true); // Показываем индикатор загрузки
+      
       // Проверяем, существует ли уже такой никнейм
       const existingProgress = await getParticipantProgressByNickname(nickname);
       
@@ -80,18 +83,19 @@ const App = () => {
       if (existingProgress) {
         console.log('Found existing progress:', existingProgress);
         // Обновляем запись в nicknames с новым userId
-        await setDoc(doc(db, 'nicknames', nickname), {
-          userId: newUser.uid,
-          lastUpdated: serverTimestamp()
-        });
-
-        // Копируем существующий прогресс для нового userId
-        await setDoc(doc(db, 'progress', newUser.uid), {
-          nickname,
-          completedImages: existingProgress.progress.completedImages || [],
-          totalSessions: existingProgress.progress.totalSessions || 0,
-          lastSessionTimestamp: serverTimestamp()
-        });
+        await Promise.all([
+          setDoc(doc(db, 'nicknames', nickname), {
+            userId: newUser.uid,
+            lastUpdated: serverTimestamp()
+          }),
+          // Копируем существующий прогресс для нового userId
+          setDoc(doc(db, 'progress', newUser.uid), {
+            nickname,
+            completedImages: existingProgress.progress.completedImages || [],
+            totalSessions: existingProgress.progress.totalSessions || 0,
+            lastSessionTimestamp: serverTimestamp()
+          })
+        ]);
 
         // Устанавливаем completedImages из существующего прогресса
         setCompletedImages(existingProgress.progress.completedImages || []);
@@ -103,32 +107,40 @@ const App = () => {
         // Для нового пользователя начинаем с пустого прогресса
         setCompletedImages([]);
         
-        // Создаем запись в nicknames
-        await setDoc(doc(db, 'nicknames', nickname), {
-          userId: newUser.uid,
-          lastUpdated: serverTimestamp()
-        });
-
-        // Создаем новый прогресс
-        await setDoc(doc(db, 'progress', newUser.uid), {
-          nickname,
-          completedImages: [],
-          totalSessions: 0,
-          lastSessionTimestamp: serverTimestamp()
-        });
+        await Promise.all([
+          // Создаем запись в nicknames
+          setDoc(doc(db, 'nicknames', nickname), {
+            userId: newUser.uid,
+            lastUpdated: serverTimestamp()
+          }),
+          // Создаем новый прогресс
+          setDoc(doc(db, 'progress', newUser.uid), {
+            nickname,
+            completedImages: [],
+            totalSessions: 0,
+            lastSessionTimestamp: serverTimestamp()
+          })
+        ]);
       }
       
       // Создаем нового участника
-      setParticipant({
+      const newParticipant = {
         nickname,
         sessionId: crypto.randomUUID(),
         isTestSession,
         startTime: new Date()
-      } as Participant);
-
+      } as Participant;
+      
+      setParticipant(newParticipant);
+      
+      // Дожидаемся обновления состояния перед навигацией
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       navigate('/instructions');
     } catch (error) {
       console.error('Error in handleNicknameSubmit:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -336,6 +348,7 @@ const App = () => {
                 )
               }
             />
+            <Route path="/explanation" element={<ExperimentExplanation />} />
           </Routes>
         </Container>
       </Box>

@@ -30,6 +30,7 @@ export interface LeaderboardEntry {
   score: number;
   rank?: number;
   ratingDetails?: any;
+  roundsCompleted: number;
 }
 
 interface LeaderboardProps {
@@ -121,6 +122,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
             <TableRow>
               <TableCell>Место</TableCell>
               <TableCell>Имя</TableCell>
+              <TableCell>Раунды</TableCell>
               <TableCell>Точность</TableCell>
               <TableCell>Среднее время</TableCell>
               <TableCell>Счёт</TableCell>
@@ -141,6 +143,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
                 <TableCell>{entry.rank}</TableCell>
                 <TableCell>
                   {entry.nickname === currentUserNickname ? entry.nickname : maskNickname(entry.nickname)}
+                </TableCell>
+                <TableCell>
+                  {entry.roundsCompleted || 0}
                 </TableCell>
                 <TableCell>
                   {entry.accuracy.toFixed(1)}%
