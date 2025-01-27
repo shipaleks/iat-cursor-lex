@@ -185,7 +185,16 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         Счёт за раунд: {isNaN(rating.finalScore) ? '0' : rating.finalScore}
       </Typography>
 
-      {canContinue && (
+      {participant.isTestSession ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, my: 3 }}>
+          <Typography variant="h6" color="primary" align="center">
+            Вы завершили тестовый раунд! 🎉
+          </Typography>
+          <Typography color="text.secondary" align="center">
+            Теперь вы можете начать настоящую игру, результаты которой будут записаны
+          </Typography>
+        </Box>
+      ) : canContinue ? (
         <>
           <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 1 }}>
             Пройдено раундов: {completedImages ? Math.floor(completedImages.length / 4) : 0} из 20
@@ -202,9 +211,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
             Играть ещё
           </Button>
         </>
-      )}
-
-      {!canContinue && !participant.isTestSession && (
+      ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, my: 3 }}>
           <Typography variant="h6" color="success.main" align="center">
             Поздравляем! Вы успешно завершили все раунды! 🎉
@@ -282,10 +289,10 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         )}
         <Button
           variant="outlined"
-          onClick={() => navigate('/')}
+          onClick={() => window.location.href = '/'}
           fullWidth
         >
-          В начало
+          {participant.isTestSession ? 'Начать игру' : 'В начало'}
         </Button>
       </Box>
     </Box>

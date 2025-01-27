@@ -149,7 +149,7 @@ const App = () => {
     setShowCompletionScreen(true);
     
     // Проверяем, может ли участник продолжить
-    if (user && !participant?.isTestSession) {
+    if (user) {
       try {
         const progress = await getParticipantProgress(user.uid);
         if (progress) {
@@ -180,10 +180,11 @@ const App = () => {
   const handleStartNewSession = () => {
     if (participant) {
       setShowCompletionScreen(false);
-      // Создаем новую сессию с новым ID, сохраняя остальные параметры
+      // После тестового раунда всегда переходим в обычный режим
       setParticipant({
         ...participant,
-        sessionId: crypto.randomUUID()
+        sessionId: crypto.randomUUID(),
+        isTestSession: false // Всегда устанавливаем в false для нового раунда
       });
       setExperimentStats(null);
       navigate('/experiment');
