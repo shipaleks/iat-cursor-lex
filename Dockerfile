@@ -45,6 +45,16 @@ RUN npm install -g serve
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./
 
+# Создаем файл с конфигурацией Firebase для клиента
+RUN echo 'window.firebaseConfig = { \
+  apiKey: "AIzaSyDwFohf7gaY0QUl1Oiz2GiB1ZwCSsPVSaY", \
+  authDomain: "iat-experiment-v2.firebaseapp.com", \
+  projectId: "iat-experiment-v2", \
+  storageBucket: "iat-experiment-v2.firebasestorage.app", \
+  messagingSenderId: "703791598754", \
+  appId: "1:703791598754:web:ef80e511f703f87e4cdbfb" \
+};' > ./dist/firebase-config.js
+
 # Устанавливаем Firebase переменные окружения
 ENV VITE_FIREBASE_API_KEY=AIzaSyDwFohf7gaY0QUl1Oiz2GiB1ZwCSsPVSaY
 ENV VITE_FIREBASE_AUTH_DOMAIN=iat-experiment-v2.firebaseapp.com
