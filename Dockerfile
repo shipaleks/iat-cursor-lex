@@ -45,9 +45,17 @@ RUN npm install -g serve
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./
 
+# Устанавливаем Firebase переменные окружения
+ENV VITE_FIREBASE_API_KEY=AIzaSyDwFohf7gaY0QUl1Oiz2GiB1ZwCSsPVSaY
+ENV VITE_FIREBASE_AUTH_DOMAIN=iat-experiment-v2.firebaseapp.com
+ENV VITE_FIREBASE_PROJECT_ID=iat-experiment-v2
+ENV VITE_FIREBASE_STORAGE_BUCKET=iat-experiment-v2.firebasestorage.app
+ENV VITE_FIREBASE_MESSAGING_SENDER_ID=703791598754
+ENV VITE_FIREBASE_APP_ID=1:703791598754:web:ef80e511f703f87e4cdbfb
+
 # Устанавливаем переменную окружения для порта по умолчанию
 # Railway перезапишет эту переменную своим значением
 ENV PORT=10000
 
 # Запускаем приложение, используя переменную окружения $PORT
-CMD ["sh", "-c", "serve dist -s -p $PORT"] 
+CMD ["sh", "-c", "serve dist -s -p $PORT"]
