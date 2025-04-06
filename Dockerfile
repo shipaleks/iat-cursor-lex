@@ -45,8 +45,9 @@ RUN npm install -g serve
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./
 
-# Устанавливаем переменную окружения для порта
+# Устанавливаем переменную окружения для порта по умолчанию
+# Railway перезапишет эту переменную своим значением
 ENV PORT=10000
 
-# Запускаем приложение
-CMD ["serve", "dist", "-s", "-p", "10000"] 
+# Запускаем приложение, используя переменную окружения $PORT
+CMD ["sh", "-c", "serve dist -s -p $PORT"] 
