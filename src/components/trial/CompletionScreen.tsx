@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Button, Card, CircularProgress, IconButton, Tooltip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { calculateRating } from '../../firebase/service.tsx';
-import { RatingCalculation } from '../../firebase/service.tsx';
+import { calculateRating, getParticipantProgress } from '../../firebase/service.tsx';
+import { RatingCalculation, Participant as ParticipantType, TrialResult, LeaderboardEntry as LeaderboardEntryType } from '../../types';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { Leaderboard } from '../leaderboard/Leaderboard';
-import { getParticipantProgress } from '../../firebase/service.tsx';
 import { auth } from '../../firebase/config.tsx';
 
 interface CompletionScreenProps {
