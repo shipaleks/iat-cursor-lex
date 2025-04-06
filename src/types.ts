@@ -14,6 +14,8 @@ export interface Participant {
   nickname: string;
   sessionId: string;
   isTestSession: boolean;
+  startTime: Date;
+  userId: string;
 }
 
 export interface ExperimentStats {
@@ -31,10 +33,11 @@ export interface ImageData {
   model: string;
 }
 
-export type WordType = 'target' | 'antonym' | 'factor' | 'non-word';
+export type WordType = 'aesthetic' | 'non-word';
 
 export interface Trial {
   imageId: string;
+  imageFileName: string;
   word: string;
   wordType: WordType;
 }
@@ -48,12 +51,12 @@ export interface Session {
 }
 
 export interface TrialResult {
-  imageId: string;
+  participantNickname: string;
+  imageFileName: string;
   word: string;
   wordType: WordType;
   isCorrect: boolean;
-  reactionTime: number;
-  participantNickname: string;
+  reactionTimeMs: number;
 }
 
 export interface TrialState {
@@ -72,24 +75,26 @@ export interface ParticipantProgress {
   totalSessions: number;
   lastSessionTimestamp: any; // Firebase Timestamp
   createdAt: any; // Firebase Timestamp
+  imagesSeenWithRealWord?: string[];
+  v8ImagesSeenCount?: number;
+  v10ImagesSeenCount?: number;
+  imageCounts?: { [key: string]: number };
 }
 
 export interface LeaderboardEntry {
   nickname: string;
-  totalTrials: number;
-  correctTrials: number;
   totalTimeMs: number;
   score: number;
-  ratingDetails?: {
-    timeScore: number;
-    accuracyMultiplier: number;
-    roundBonus: number;
-    finalScore: number;
-    theoreticalMinTime: number;
-    actualTime: number;
-    accuracy: number;
-    roundsCompleted: number;
-  };
+  roundsCompleted: number;
+  deviceType?: 'mobile' | 'desktop';
+  ratingDetails?: RatingCalculation;
+}
+
+export interface RatingCalculation {
+  rating: number;
+  feedbackMessage?: string;
+  roundsCompleted: number;
+  bonusPercentage: number;
 }
 
 // ... rest of the types ... 

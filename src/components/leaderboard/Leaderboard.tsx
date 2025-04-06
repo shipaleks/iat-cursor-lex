@@ -16,6 +16,7 @@ import {
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { getLeaderboard } from '../../firebase/service.tsx';
+import { LeaderboardEntry as LeaderboardEntryType } from '../../types';
 
 // Функция маскировки никнейма
 const maskNickname = (nickname: string): string => {
@@ -23,14 +24,9 @@ const maskNickname = (nickname: string): string => {
   return `${nickname.slice(0, 2)}${'*'.repeat(3)}${nickname.slice(-1)}`;
 };
 
-export interface LeaderboardEntry {
-  nickname: string;
-  accuracy: number;
-  totalTimeMs: number;
-  score: number;
+// Extend the LeaderboardEntry type for UI purposes
+export interface LeaderboardEntry extends LeaderboardEntryType {
   rank?: number;
-  ratingDetails?: any;
-  roundsCompleted: number;
 }
 
 interface LeaderboardProps {
@@ -48,6 +44,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
     const loadLeaderboard = async () => {
       try {
         const data = await getLeaderboard();
+        
         // Сортируем по убыванию рейтинга и добавляем ранг
         const sortedData = data
           .sort((a, b) => b.score - a.score)
@@ -125,6 +122,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
               <TableCell>Раунды</TableCell>
               <TableCell>Точность</TableCell>
               <TableCell>Среднее время</TableCell>
+              <TableCell>Устройство</TableCell>
               <TableCell>Счёт</TableCell>
             </TableRow>
           </TableHead>
@@ -132,13 +130,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
             {displayedEntries.map((entry) => (
               <TableRow 
                 key={entry.nickname} 
-                sx={{ 
-                  bgcolor: entry.nickname === currentUserNickname ? 'primary.light' : 'inherit',
-                  color: entry.nickname === currentUserNickname ? 'primary.contrastText' : 'inherit',
-                  '& td': {
-                    color: entry.nickname === currentUserNickname ? 'primary.contrastText' : 'inherit'
-                  }
-                }}
+                className={entry.nickname === currentUserNickname ? 'current-user' : ''}
               >
                 <TableCell>{entry.rank}</TableCell>
                 <TableCell>
@@ -148,13 +140,16 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
                   {entry.roundsCompleted || 0}
                 </TableCell>
                 <TableCell>
-                  {entry.accuracy.toFixed(1)}%
+                  {entry.ratingDetails?.accuracy !== undefined ? entry.ratingDetails.accuracy.toFixed(1) : '0.0'}%
                 </TableCell>
                 <TableCell>
                   {formatTime(entry.totalTimeMs)}
                 </TableCell>
                 <TableCell>
-                  {entry.score.toFixed(0)}
+                  {entry.deviceType === 'mobile' ? 'Мобильное' : 'Настольное'}
+                </TableCell>
+                <TableCell>
+                  {entry.score !== undefined ? entry.score.toFixed(0) : '0'}
                 </TableCell>
               </TableRow>
             ))}

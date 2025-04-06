@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, useTheme, useMediaQuery } from '@mui/material';
+import { Box, useTheme, useMediaQuery, Paper } from '@mui/material';
 
 interface ImageDisplayProps {
   imageUrl: string;
@@ -21,20 +21,40 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ imageUrl }) => {
         padding: { xs: '0.5rem', sm: '1rem' },
       }}
     >
-      <Box
-        component="img"
-        src={imageUrl}
-        alt="Stimulus"
+      <Paper
+        elevation={4}
         sx={{
-          display: 'block',
-          maxWidth: '100%',
-          maxHeight: '100%',
-          width: 'auto',
-          height: 'auto',
-          objectFit: 'contain',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 1,
+          backgroundColor: 'rgba(30, 30, 30, 0.7)',  // Dark translucent background instead of white
           borderRadius: '8px',
+          overflow: 'hidden',
+          boxShadow: theme.palette.mode === 'dark' ? '0 0 10px rgba(0, 0, 0, 0.5)' : 'none',
+          maxWidth: '95vw',
+          maxHeight: '80vh',
+          [theme.breakpoints.up('md')]: {
+            maxWidth: '70vw',
+            maxHeight: '70vh'
+          }
         }}
-      />
+      >
+        <Box
+          component="img"
+          src={imageUrl}
+          alt="Stimulus"
+          sx={{
+            display: 'block',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            width: 'auto',
+            height: 'auto',
+            objectFit: 'contain',
+            borderRadius: '4px',
+          }}
+        />
+      </Paper>
     </Box>
   );
 }; 

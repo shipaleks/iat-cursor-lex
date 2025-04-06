@@ -16,6 +16,7 @@
     "@firebase/auth": "^1.8.2",
     "@firebase/firestore": "^4.7.6",
     "@firebase/storage": "^0.13.5",
+    "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
     "@mui/icons-material": "^6.4.0",
     "@mui/material": "^6.4.0",
     "@types/papaparse": "^5.3.15",

@@ -8,51 +8,76 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { Leaderboard } from '../leaderboard/Leaderboard';
+import { getParticipantProgress } from '../../firebase/service.tsx';
+import { auth } from '../../firebase/config.tsx';
 
 interface CompletionScreenProps {
   participant: {
     sessionId: string;
     nickname: string;
     isTestSession: boolean;
+    userId: string;
   };
   sessionStats: {
     totalTrials: number;
     correctTrials: number;
     totalTimeMs: number;
   };
-  canContinue: boolean;
   onNextRound: () => void;
   completedImages?: string[];
 }
 
-export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant, sessionStats, canContinue, onNextRound, completedImages }) => {
+export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant, sessionStats, onNextRound, completedImages }) => {
   const navigate = useNavigate();
   const [rating, setRating] = useState<RatingCalculation | null>(null);
 
   useEffect(() => {
     const calculateAndShowRating = async () => {
       try {
-        console.log('Session stats:', sessionStats);
-        const roundsCompleted = completedImages ? Math.floor(completedImages.length / 4) : 0;
-        console.log('Rounds completed:', roundsCompleted);
+        console.log('Статистика сессии:', sessionStats);
+        console.log('Массив завершенных изображений (детали):', {
+          имеется: completedImages !== undefined,
+          длина: completedImages?.length || 0,
+          примерСодержимого: completedImages?.slice(0, 3)
+        });
+        
+        // Получаем информацию о прогрессе пользователя из Firebase
+        let roundsCompleted = 1; // Начинаем с 1
+        
+        if (participant && participant.userId) {
+          try {
+            const progress = await getParticipantProgress(participant.userId);
+            if (progress && progress.totalSessions) {
+              roundsCompleted = Math.max(1, progress.totalSessions);
+              console.log(`🔢 РАСЧЕТ РАУНДОВ НА ФИНАЛЬНОМ ЭКРАНЕ:`);
+              console.log(`  - ID пользователя: ${participant.userId}`);
+              console.log(`  - Никнейм: ${participant.nickname}`);
+              console.log(`  - Количество сессий в БД: ${progress.totalSessions}`);
+              console.log(`  - Итоговый номер раунда: ${roundsCompleted}`);
+            }
+          } catch (error) {
+            console.error('Ошибка при получении прогресса:', error);
+          }
+        }
+        
         const rating = await calculateRating(
           sessionStats.totalTrials,
           sessionStats.correctTrials,
           sessionStats.totalTimeMs,
           roundsCompleted
         );
-        console.log('Calculated rating:', rating);
+        console.log('Полученный рейтинг от сервера:', JSON.stringify(rating, null, 2));
         setRating(rating);
       } catch (error) {
-        console.error('Error calculating rating:', error);
+        console.error('Ошибка при расчете рейтинга:', error);
       }
     };
 
     calculateAndShowRating();
-  }, [sessionStats, completedImages]);
+  }, [sessionStats, completedImages, participant]);
 
   if (!rating) return null;
-  console.log('Rendering with rating:', rating);
+  console.log('Отображение с рейтингом:', rating);
 
   const StatCard = ({ title, icon, score, maxScore, color, description }: { 
     title: string; 
@@ -72,7 +97,9 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
       p: { xs: 1, sm: 2 },
       pt: { xs: 2, sm: 3 },
       m: 0.5,
-      position: 'relative'
+      position: 'relative',
+      bgcolor: 'background.paper',
+      boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.5)' : '0 2px 8px rgba(0, 0, 0, 0.1)'
     }}>
       <Box sx={{ position: 'relative', mb: 2, width: { xs: 45, sm: 60 }, height: { xs: 45, sm: 60 }, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress
@@ -80,7 +107,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
           value={100}
           size={45}
           thickness={3}
-          sx={{ color: 'grey.200', position: 'absolute' }}
+          sx={{ color: 'grey.800', position: 'absolute' }}
         />
         <CircularProgress
           variant="determinate"
@@ -109,7 +136,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         {title}
       </Typography>
       <Typography variant="h6" align="center" sx={{ color, fontSize: { xs: '1rem', sm: '1.25rem' }, mb: 1.5, minHeight: '1.5rem' }}>
-        {title === "Бонус" ? `×${isNaN(score) ? '0' : Math.round(score * 100)}%` : (isNaN(score) ? '0' : score)}
+        {title === "Бонус" ? `×${Math.round(score * 100)}%` : (isNaN(score) ? '0' : score)}
       </Typography>
       <Typography 
         variant="caption" 
@@ -123,26 +150,28 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
         }}
       >
         {title === "Бонус" ? 
-          `за ${rating.roundsCompleted} из ${maxBonusRounds} раундов\n(+10% за раунд)` : 
+          `Раунд ${rating.roundsCompleted}\n(+5% за раунд)` : 
           description}
       </Typography>
     </Card>
   );
 
-  // Вычисляем максимальный бонус за раунды (20 = 100%)
+  // Вычисляем максимальный бонус за раунды
   const maxBonusRounds = 20;
-  const bonusScore = Math.round((rating.roundBonus - 1) * 100);
-  const bonusPercent = (rating.roundsCompleted / maxBonusRounds) * 100;
+  const bonusPercent = Math.min(100, rating.roundsCompleted * 5); // 20 раундов = 100%
+
+  // Вычисление процента для прогресс-бара бонуса (остается как есть, но для информации)
+  const bonusPercentForProgress = Math.min(100, (rating.bonusPercentage - 100) / 1.25); // ( тек_бонус - 100 ) / 125 * 100
 
   return (
     <Box sx={{ 
       height: '100dvh',
       display: 'flex',
       flexDirection: 'column',
-      bgcolor: 'grey.100',
+      bgcolor: 'background.default',
       p: { xs: 2, sm: 3 }
     }}>
-      <Typography variant="h5" gutterBottom align="center">
+      <Typography variant="h5" gutterBottom align="center" color="text.primary">
         Результаты раунда
       </Typography>
 
@@ -169,15 +198,15 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
           score={Math.round(rating.accuracyMultiplier * 85)}
           maxScore={85}
           color="success.main"
-          description={`из 85 баллов\n${Math.round(rating.accuracy)}% верных ответов`}
+          description={`${sessionStats.correctTrials} из ${sessionStats.totalTrials} (${Math.round(rating.accuracy)}%)`}
         />
         <StatCard
           title="Бонус"
           icon={<EmojiEventsIcon sx={{ fontSize: 30, color: 'warning.main' }} />}
-          score={Math.round(rating.roundBonus * 100) / 100}
-          maxScore={4}
+          score={rating.roundBonus}
+          maxScore={3}
           color="warning.main"
-          description={`за ${rating.roundsCompleted} из ${maxBonusRounds} раундов\n(+10% за раунд)`}
+          description={`Раунд ${rating.roundsCompleted}\n(+10% за каждый раунд)`}
         />
       </Box>
 
@@ -194,13 +223,14 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
             Теперь вы можете начать настоящую игру, результаты которой будут записаны
           </Typography>
         </Box>
-      ) : canContinue ? (
+      ) : (
         <>
           <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 1 }}>
-            Пройдено раундов: {completedImages ? Math.floor(completedImages.length / 4) : 0} из 20
+            Пройдено раундов: {rating.roundsCompleted} из 25
           </Typography>
+          
           <Typography variant="body1" color="primary" align="center" sx={{ mb: 2 }}>
-            Продолжайте играть, чтобы улучшить свой рейтинг! Каждый новый раунд увеличивает ваш бонус ещё на 10%
+            Продолжайте играть, чтобы увеличить бонус! С каждым новым раундом ваш бонус растёт на 5% (до 25 раунда)
           </Typography>
           <Button
             variant="contained"
@@ -211,20 +241,6 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
             Играть ещё
           </Button>
         </>
-      ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, my: 3 }}>
-          <Typography variant="h6" color="success.main" align="center">
-            Поздравляем! Вы успешно завершили все раунды! 🎉
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => navigate('/explanation')}
-            sx={{ minWidth: 250 }}
-          >
-            Узнать больше об эксперименте
-          </Button>
-        </Box>
       )}
 
       {!participant.isTestSession && (
@@ -247,8 +263,13 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
                     <br/>Чем ближе к оптимальному времени (1.5с на слово), тем больше баллов
                     <br/><br/>
                     • <b>Бонус за раунды</b>
-                    <br/>Увеличивает итоговый счёт на 10% за каждый пройденный раунд:
-                    <br/>1 раунд: ×1.1, 2 раунда: ×1.2, 3 раунда: ×1.3 и т.д.
+                    <br/>Увеличивает итоговый счёт на 5% за каждый пройденный раунд (максимум 25 раундов, +125%):
+                    <br/>1 раунд: ×1.05 (105%), 2 раунда: ×1.10 (110%), ..., 25+ раундов: ×2.25 (225%)
+                    <br/><br/>
+                    • <b>Сбалансированная точность</b>
+                    <br/>В таблице лидеров показана сбалансированная точность (среднее между точностью на словах и не-словах).
+                    <br/>Эта метрика может отличаться от простой точности (правильные/всего) показанной в карточке.
+                    <br/>Например, если всегда нажимать "Слово", сбалансированная точность будет ≈50% (100% на словах, 0% на не-словах).
                     <br/><br/>
                     • <b>Рейтинг в таблице</b>
                     <br/>В таблице лидеров показан средний счёт по всем вашим раундам
@@ -282,11 +303,6 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
       )}
 
       <Box sx={{ mt: 'auto', display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {!canContinue && !participant.isTestSession && (
-          <Typography sx={{ mt: 2, color: 'success.main' }}>
-            Поздравляем! Вы прошли все раунды. Теперь можно начать новую игру с теми же изображениями.
-          </Typography>
-        )}
         <Button
           variant="outlined"
           onClick={() => window.location.href = '/'}

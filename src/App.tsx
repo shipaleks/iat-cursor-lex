@@ -14,18 +14,75 @@ import { signInAnonymousUser, getParticipantProgress, getParticipantProgressByNi
 import { auth } from './firebase/config.tsx';
 import { User } from 'firebase/auth';
 import { IMAGES } from './utils/trialGenerator';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDocs, writeBatch, collection } from 'firebase/firestore';
 import { db } from './firebase/config.tsx';
 import { ExperimentExplanation } from './components/trial/ExperimentExplanation';
+import { TrialResult } from './types';
+import { updateParticipantProgress, updateLeaderboard } from './firebase/service.tsx';
+import { RatingCalculation } from './types';
 
 const theme = createTheme({
   palette: {
+    mode: 'dark',
     background: {
-      default: '#e0e0e0',
-      paper: '#f5f5f5'
+      default: '#1e1e1e',
+      paper: '#262626'
     },
     primary: {
-      main: '#000000'
+      main: '#90caf9'
+    },
+    secondary: {
+      main: '#ce93d8'
+    },
+    text: {
+      primary: '#ffffff',
+      secondary: '#b0b0b0'
+    },
+    divider: 'rgba(255, 255, 255, 0.12)',
+    grey: {
+      50: '#2c2c2c',
+      100: '#262626',
+      200: '#1e1e1e',
+      300: '#161616',
+      400: '#121212',
+      500: '#0d0d0d',
+      // Add other grey shades as needed
+      800: '#000000',
+      900: '#000000'
+    },
+    success: {
+      main: '#4caf50',
+      light: '#81c784'
+    },
+    error: {
+      main: '#f44336',
+      light: '#e57373'
+    }
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        outlined: {
+          borderColor: 'rgba(255, 255, 255, 0.23)',
+          '&:hover': {
+            borderColor: 'rgba(255, 255, 255, 0.5)'
+          }
+        }
+      }
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#2d2d2d'
+        }
+      }
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none'
+        }
+      }
     }
   }
 });
@@ -36,29 +93,43 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [experimentStats, setExperimentStats] = useState<ExperimentStats | null>(null);
-  const [canContinue, setCanContinue] = useState(false);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
   const [completedImages, setCompletedImages] = useState<string[]>([]);
+  const [roundsCompleted, setRoundsCompleted] = useState(1);
+  const [leaderboardRating, setLeaderboardRating] = useState<RatingCalculation | null>(null);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (!user) {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+      if (!currentUser) {
+        // Если нет пользователя, создаем нового анонимного
         try {
           const newUser = await signInAnonymousUser();
           setUser(newUser);
+          setCompletedImages([]); // Сбрасываем изображения для нового пользователя
+          setParticipant(null);  // Сбрасываем участника
+          setExperimentStats(null); // Сбрасываем статистику
+          console.log('Created new anonymous user:', newUser.uid);
         } catch (error) {
           console.error('Error during anonymous authentication:', error);
         }
       } else {
-        setUser(user);
-        // Загружаем прогресс при авторизации
+        // Если пользователь уже есть (вернулся или был создан ранее)
+        setUser(currentUser);
+        console.log('User already authenticated:', currentUser.uid);
+        
+        // Пытаемся загрузить прогресс, связанный с этим auth.currentUser.uid
         try {
-          const progress = await getParticipantProgress(user.uid);
+          const progress = await getParticipantProgress(currentUser.uid);
           if (progress) {
+            console.log('Loaded initial progress for auth user:', currentUser.uid, 'with', progress.completedImages?.length, 'images and', progress.totalSessions, 'sessions');
             setCompletedImages(progress.completedImages || []);
+            // Здесь НЕ устанавливаем participant, т.к. никнейм еще не введен
+          } else {
+            console.log('No existing progress found for auth user:', currentUser.uid);
+            setCompletedImages([]);
           }
         } catch (error) {
-          console.error('Error loading progress:', error);
+          console.error('Error loading initial progress:', error);
         }
       }
       setLoading(false);
@@ -69,125 +140,184 @@ const App = () => {
 
   const handleNicknameSubmit = async (nickname: string, isTestSession: boolean) => {
     try {
-      setLoading(true); // Показываем индикатор загрузки
+      setLoading(true); 
       
-      // Проверяем, существует ли уже такой никнейм
+      // 1. Ищем прогресс по НИКНЕЙМУ
       const existingProgress = await getParticipantProgressByNickname(nickname);
       
-      // Создаем новую анонимную сессию
-      const newUser = await signInAnonymousUser();
-      if (!newUser) {
-        throw new Error('Failed to create anonymous user');
-      }
-
-      if (existingProgress) {
-        console.log('Found existing progress:', existingProgress);
-        // Обновляем запись в nicknames с новым userId
-        await Promise.all([
-          setDoc(doc(db, 'nicknames', nickname), {
-            userId: newUser.uid,
-            lastUpdated: serverTimestamp()
-          }),
-          // Копируем существующий прогресс для нового userId
-          setDoc(doc(db, 'progress', newUser.uid), {
-            nickname,
-            completedImages: existingProgress.progress.completedImages || [],
-            totalSessions: existingProgress.progress.totalSessions || 0,
-            lastSessionTimestamp: serverTimestamp()
-          })
-        ]);
-
-        // Устанавливаем completedImages из существующего прогресса
-        setCompletedImages(existingProgress.progress.completedImages || []);
-        console.log('Restored progress:', {
-          completedImages: existingProgress.progress.completedImages?.length || 0,
-          rounds: Math.floor((existingProgress.progress.completedImages?.length || 0) / 4)
-        });
-      } else {
-        // Для нового пользователя начинаем с пустого прогресса
-        setCompletedImages([]);
+      if (existingProgress && existingProgress.userId) {
+        // 2. Если НАШЛИ прогресс по никнейму
+        console.log(`Found existing progress for nickname: ${nickname} with userId: ${existingProgress.userId}`);
         
-        await Promise.all([
-          // Создаем запись в nicknames
-          setDoc(doc(db, 'nicknames', nickname), {
-            userId: newUser.uid,
-            lastUpdated: serverTimestamp()
-          }),
-          // Создаем новый прогресс
-          setDoc(doc(db, 'progress', newUser.uid), {
-            nickname,
-            completedImages: [],
-            totalSessions: 0,
-            lastSessionTimestamp: serverTimestamp()
-          })
-        ]);
+        // Устанавливаем правильный userId для состояния participant
+        const currentUserId = existingProgress.userId;
+        setUser(auth.currentUser); // Обновляем auth пользователя, если нужно
+        
+        // Загружаем актуальные completedImages и totalSessions из найденного прогресса
+        const loadedProgress = existingProgress.progress;
+        setCompletedImages(loadedProgress.completedImages || []);
+        const loadedSessions = loadedProgress.totalSessions || 0;
+        console.log(`Loaded data for existing participant: ${loadedProgress.completedImages?.length} images, ${loadedSessions} sessions`);
+        
+        // Создаем объект участника с ПРАВИЛЬНЫМ userId
+        const existingParticipant: Participant = {
+          nickname,
+          sessionId: crypto.randomUUID(),
+          isTestSession,
+          startTime: new Date(),
+          userId: currentUserId // Используем найденный userId
+        };
+        setParticipant(existingParticipant);
+        console.log('Restored existing participant state:', existingParticipant);
+
+      } else {
+        // 3. Если НЕ НАШЛИ прогресс по никнейму - создаем НОВОГО
+        // Используем текущего АКТИВНОГО auth пользователя (auth.currentUser)
+        if (!auth.currentUser) {
+          throw new Error('Current user not found during new participant creation');
+        }
+        const currentAuthUserId = auth.currentUser.uid;
+        console.log(`No existing progress for nickname ${nickname}. Creating new participant linked to auth user ${currentAuthUserId}`);
+        
+        // Сбрасываем completedImages, так как это новый прогресс
+        setCompletedImages([]); 
+        
+        // Создаем связь никнейма с текущим auth userID
+        await setDoc(doc(db, 'nicknames', nickname), {
+          userId: currentAuthUserId,
+          lastUpdated: serverTimestamp()
+        });
+        
+        // Создаем новую запись прогресса для этого auth userID
+        await setDoc(doc(db, 'progress', currentAuthUserId), {
+          nickname,
+          completedImages: [],
+          totalSessions: 0,
+          lastSessionTimestamp: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          userId: currentAuthUserId
+        });
+        console.log('Created new progress entry for user:', currentAuthUserId);
+        
+        // Создаем объект участника с ID текущего auth пользователя
+        const newParticipant: Participant = {
+          nickname,
+          sessionId: crypto.randomUUID(),
+          isTestSession,
+          startTime: new Date(),
+          userId: currentAuthUserId // Связываем с текущим auth user
+        };
+        setParticipant(newParticipant);
+        console.log('Created new participant state:', newParticipant);
       }
-      
-      // Создаем нового участника
-      const newParticipant = {
-        nickname,
-        sessionId: crypto.randomUUID(),
-        isTestSession,
-        startTime: new Date()
-      } as Participant;
-      
-      setParticipant(newParticipant);
-      
-      // Дожидаемся обновления состояния перед навигацией
-      await new Promise(resolve => setTimeout(resolve, 0));
       
       navigate('/instructions');
     } catch (error) {
-      console.error('Error in handleNicknameSubmit:', error);
+      console.error('Error handling nickname submit:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExperimentComplete = async (stats: ExperimentStats) => {
+  const handleExperimentComplete = async (stats: ExperimentStats, trialsData: TrialResult[]) => {
     setExperimentStats(stats);
+    console.log('[App] Experiment complete. Stats:', stats, 'Trials:', trialsData.length);
+
     setShowCompletionScreen(true);
+    navigate('/completion');
     
-    // Проверяем, может ли участник продолжить
-    if (user) {
+    if (user && participant) {
       try {
-        const progress = await getParticipantProgress(user.uid);
-        if (progress) {
-          // Обновляем состояние completedImages
-          setCompletedImages(progress.completedImages || []);
-          const canStartNewSession = (progress.completedImages || []).length < IMAGES.length;
-          console.log('Progress check:', { 
-            completedImages: progress.completedImages, 
-            totalImages: IMAGES.length, 
-            canStartNewSession 
-          });
-          setCanContinue(canStartNewSession);
-        } else {
-          // Если прогресса нет, значит это первый раунд
-          setCompletedImages([]);
-          setCanContinue(true);
-        }
+        // Передаем participantId, nickname и trialsData
+        await updateParticipantProgress(user.uid, participant.nickname, trialsData);
+        
+        // Обновляем leaderboard ПОСЛЕ обновления прогресса
+        // Передаем nickname, participantId, stats и deviceType
+        const device = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+        const ratingData = await updateLeaderboard(
+          participant.nickname, 
+          user.uid, 
+          stats.correct,
+          stats.total,
+          stats.totalTimeMs,
+          device
+        ); 
+        setLeaderboardRating(ratingData); // Теперь типы совпадают
+        console.log("[App] Leaderboard rating updated after progress save:", ratingData);
+        
       } catch (error) {
-        console.error('Error checking progress:', error);
-        // В случае ошибки позволяем продолжить
-        setCanContinue(true);
+        console.error("[App] Error updating progress or leaderboard:", error);
       }
     } else {
-      setCanContinue(false);
+      console.warn("[App] User or participant not available on experiment complete.")
     }
   };
 
   const handleStartNewSession = () => {
-    if (participant) {
+    // Используем ID ТЕКУЩЕГО УЧАСТНИКА
+    if (participant && participant.userId) {
+      console.log(`Starting new session for participant ${participant.nickname} (userId: ${participant.userId})`);
       setShowCompletionScreen(false);
-      // После тестового раунда всегда переходим в обычный режим
+      
+      // Обновляем participant state для новой сессии
       setParticipant({
         ...participant,
         sessionId: crypto.randomUUID(),
-        isTestSession: false // Всегда устанавливаем в false для нового раунда
+        isTestSession: false
       });
+      
       setExperimentStats(null);
-      navigate('/experiment');
+      
+      // Загружаем АКТУАЛЬНЫЙ прогресс перед началом нового раунда
+      // Гарантируем, что completedImages корректны для createSession
+      getParticipantProgress(participant.userId)
+        .then(progress => {
+          if (progress) {
+            setCompletedImages(progress.completedImages || []);
+            console.log(`Loaded progress before new round: ${progress.completedImages?.length} images, ${progress.totalSessions} sessions`);
+            navigate('/experiment');
+          } else {
+            console.warn(`Could not load progress before new round for user ${participant.userId}`);
+            setCompletedImages([]);
+            navigate('/experiment');
+          }
+        })
+        .catch(error => {
+          console.error('Error loading progress before new round:', error);
+          setCompletedImages([]);
+          navigate('/experiment');
+        });
+
+    } else {
+      console.warn('Cannot start new session: participant or userId is missing.');
+      // Возможно, перенаправить на главную или показать ошибку
+      navigate('/');
+    }
+  };
+
+  // Загрузка прогресса участника
+  const loadParticipantProgress = async (userId: string) => {
+    setLoading(true);
+    try {
+      const progress = await getParticipantProgress(userId);
+      if (progress) {
+        setCompletedImages(progress.completedImages || []);
+        // === ДОБАВЛЯЕМ РАСЧЕТ И ОБНОВЛЕНИЕ roundsCompleted ===
+        const calculatedRounds = Math.max(1, progress.totalSessions || 0);
+        setRoundsCompleted(calculatedRounds);
+        console.log(`[App] Progress loaded for ${userId}, calculated rounds: ${calculatedRounds} (based on ${progress.totalSessions} totalSessions)`);
+        // === КОНЕЦ ДОБАВЛЕНИЯ ===
+      } else {
+        setCompletedImages([]);
+        setRoundsCompleted(1); // Если прогресса нет, начинаем с 1 раунда
+        console.log(`[App] No progress found for ${userId}, setting rounds to 1`);
+      }
+    } catch (error) {
+      console.error("Error loading participant progress:", error);
+      setCompletedImages([]);
+      setRoundsCompleted(1); // В случае ошибки тоже ставим 1 раунд
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -281,7 +411,7 @@ const App = () => {
           disableGutters
           sx={{
             height: '100%',
-            maxWidth: { xs: '100%', sm: 600 },
+            maxWidth: { xs: '100%', sm: 900 },
             mx: 'auto',
             display: 'flex',
             flexDirection: 'column',
@@ -298,7 +428,21 @@ const App = () => {
                 user && !participant ? (
                   <NicknameForm onSubmit={handleNicknameSubmit} />
                 ) : (
-                  <Navigate to="/instructions" replace />
+                  <Navigate to={user && participant ? "/instructions" : "/"} replace />
+                )
+              }
+            />
+            <Route
+              path="/start"
+              element={
+                user ? (
+                  participant ? (
+                    <Navigate to="/instructions" replace />
+                  ) : (
+                    <NicknameForm onSubmit={handleNicknameSubmit} />
+                  )
+                ) : (
+                  <Navigate to="/" replace />
                 )
               }
             />
@@ -332,20 +476,18 @@ const App = () => {
             <Route
               path="/completion"
               element={
-                showCompletionScreen && participant && experimentStats ? (
-                  <CompletionScreen
+                participant && experimentStats ? (
+                  <CompletionScreen 
                     participant={participant}
                     sessionStats={{
                       totalTrials: experimentStats.total,
                       correctTrials: experimentStats.correct,
                       totalTimeMs: experimentStats.totalTimeMs
                     }}
-                    canContinue={canContinue}
                     onNextRound={handleStartNewSession}
-                    completedImages={completedImages}
                   />
                 ) : (
-                  <Navigate to="/" replace />
+                  <Navigate to="/start" />
                 )
               }
             />

@@ -4,21 +4,23 @@ import { ImageDisplay } from './ImageDisplay';
 import { WordDisplay } from './WordDisplay';
 import { KeyboardArrowLeft, KeyboardArrowRight } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { Session, TrialState, ImageData } from '../../types';
+import { Session, TrialState, ImageData, TrialResult } from '../../types';
 import { createSession, IMAGES } from '../../utils/trialGenerator';
-import { saveTrialResult, saveSessionResults, updateLeaderboard, updateParticipantProgress } from '../../firebase/service.tsx';
+import { saveTrialResult, saveSessionResults, updateLeaderboard, updateParticipantProgress, getPreviousTrials } from '../../firebase/service.tsx';
 import { auth } from '../../firebase/config.tsx';
 import { getParticipantProgress, getParticipantProgressByNickname } from '../../firebase/service.tsx';
+import { getDeviceType } from '../../utils/deviceUtils';
 
 const IMAGE_DISPLAY_TIME = 1000; // ms
 
 interface ExperimentScreenProps {
-  participant: { 
-    sessionId: string; 
+  participant: {
+    sessionId: string;
     nickname: string;
     isTestSession: boolean;
+    userId: string;
   };
-  onComplete: (stats: { correct: number; total: number; totalTimeMs: number }) => void;
+  onComplete: (stats: { correct: number; total: number; totalTimeMs: number }, trialsData: TrialResult[]) => void;
 }
 
 export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant, onComplete }) => {
@@ -32,21 +34,32 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   const [sessionStartTime] = useState(Date.now());
   const [isProcessingResponse, setIsProcessingResponse] = useState(false);
   const [wordColor, setWordColor] = useState<'default' | 'success.main' | 'error.main'>('default');
+  const [completedTrialsData, setCompletedTrialsData] = useState<TrialResult[]>([]);
 
   // Инициализация сессии
   useEffect(() => {
     const initSession = async () => {
-      if (!participant || !auth.currentUser) return;
+      if (!participant || !participant.userId) return;
 
       try {
-        const progress = await getParticipantProgress(auth.currentUser.uid);
+        const progress = await getParticipantProgress(participant.userId);
         const completedImages = progress?.completedImages || [];
+        const imagesSeenWithRealWord = progress?.imagesSeenWithRealWord || [];
+        const v8SeenCount = progress?.v8ImagesSeenCount || 0;
+        const v10SeenCount = progress?.v10ImagesSeenCount || 0;
         
-        // Создаем новую сессию с правильным количеством аргументов
+        const previousTrials = await getPreviousTrials(participant.userId);
+        
+        console.log(`Initializing session for user ${participant.userId} with ${completedImages.length} completed images, ${imagesSeenWithRealWord.length} seen with real word, v8/v10 counts: ${v8SeenCount}/${v10SeenCount}, and ${previousTrials.length} previous trials`);
+        
         const session = await createSession(
           participant.sessionId,
           completedImages,
-          participant.isTestSession
+          imagesSeenWithRealWord,
+          previousTrials,
+          participant.isTestSession,
+          v8SeenCount,
+          v10SeenCount
         );
         
         if (!session) {
@@ -55,14 +68,6 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
 
         setSession(session);
         
-        // Если это не тестовая сессия, сохраняем прогресс
-        if (!participant.isTestSession) {
-          await updateParticipantProgress(
-            auth.currentUser.uid,
-            participant.nickname,
-            Array.from(completedImages)
-          );
-        }
       } catch (error) {
         console.error('Error initializing session:', error);
       }
@@ -72,7 +77,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   }, [participant]);
 
   const handleResponse = async (isWord: boolean) => {
-    if (!session || !trialState || trialState.showImage || isProcessingResponse) return;
+    if (!session || !trialState || trialState.showImage || isProcessingResponse || !participant.userId) return;
 
     setIsProcessingResponse(true);
     
@@ -81,8 +86,19 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     const isCorrect = (isWord && currentTrial.wordType !== 'non-word') || 
                      (!isWord && currentTrial.wordType === 'non-word');
 
+    // Set button response immediately
+    setLastResponse({
+      isCorrect: isCorrect,
+      button: isWord ? 'right' : 'left'
+    });
+    
     // Устанавливаем цвет в зависимости от правильности ответа
     setWordColor(isCorrect ? 'success.main' : 'error.main');
+    
+    // Increment correct answers counter if needed
+    if (isCorrect) {
+      setCorrectAnswers(prev => prev + 1);
+    }
     
     // Ждем 300мс для отображения цвета
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -91,24 +107,17 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     setWordColor('default');
 
     // Save trial result to Firebase only for non-test sessions
-    if (auth.currentUser && !participant.isTestSession) {
-      await saveTrialResult({
-        participantId: auth.currentUser.uid,
+    if (!participant.isTestSession) {
+      const trialResultData: TrialResult = {
         participantNickname: participant.nickname,
-        imageFileName: currentTrial.imageId,
+        imageFileName: currentTrial.imageFileName,
         word: currentTrial.word,
         wordType: currentTrial.wordType,
-        isCorrect,
+        isCorrect: isCorrect,
         reactionTimeMs: reactionTime
-      });
-    }
-
-    setLastResponse({
-      isCorrect: isCorrect,
-      button: isWord ? 'right' : 'left'
-    });
-    if (isCorrect) {
-      setCorrectAnswers(prev => prev + 1);
+      };
+      setCompletedTrialsData(prev => [...prev, trialResultData]);
+      await saveTrialResult(trialResultData, participant.userId);
     }
 
     // Переходим к следующему испытанию
@@ -118,61 +127,43 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
       const totalTime = Date.now() - sessionStartTime;
       const finalCorrectAnswers = correctAnswers + (isCorrect ? 1 : 0);
       
-      if (auth.currentUser && !participant.isTestSession) {
-        // Сохраняем результаты сессии
-        await saveSessionResults(
-          auth.currentUser.uid,
-          session.trials.length,
-          finalCorrectAnswers,
-          totalTime,
-          participant.nickname
-        );
+      if (!participant.isTestSession && participant.userId) {
+        const uniqueCompletedImagesInSession = [...new Set(session.trials
+          .map(t => t.imageFileName)
+          .filter((fileName): fileName is string => !!fileName)
+        )];
+        console.log('Unique images completed in this session:', uniqueCompletedImagesInSession);
+        console.log('Image filenames:', uniqueCompletedImagesInSession.join(', '));
 
-        // Обновляем таблицу лидеров
-        await updateLeaderboard(
-          auth.currentUser.uid,
-          participant.nickname,
-          session.trials.length,
-          finalCorrectAnswers,
-          totalTime
-        );
+        // await saveSessionResults(
+        //   participant.userId,
+        //   session.trials.length,
+        //   finalCorrectAnswers,
+        //   totalTime,
+        //   participant.nickname,
+        //   getDeviceType()
+        // );
 
-        // Получаем только уникальные изображения для текущего раунда
-        const uniqueCompletedImages = [...new Set(session.trials
-          .map(t => {
-            const image = IMAGES.find(img => img.id === t.imageId);
-            return image?.fileName;
-          })
-          .filter((fileName): fileName is string => fileName !== undefined && fileName !== null))];
+        // --- УДАЛЯЕМ ЭТОТ ВЫЗОВ --- 
+        // await updateParticipantProgress(
+        //   participant.userId,
+        //   participant.nickname,
+        //   session.trials 
+        // );
+        // --- КОНЕЦ УДАЛЕНИЯ ---
 
-        // Получаем текущий прогресс
-        const currentProgress = await getParticipantProgress(auth.currentUser.uid);
-        console.log('Current progress from Firebase:', currentProgress);
-
-        // Проверяем, что изображения из текущего раунда еще не были пройдены
-        const existingImages = currentProgress?.completedImages || [];
-        console.log('Existing completed images:', existingImages);
-
-        // Фильтруем только новые изображения из текущего раунда
-        const newImages = uniqueCompletedImages.filter(img => !existingImages.includes(img));
-        console.log('New images to add:', newImages);
-
-        // Объединяем с уже пройденными изображениями
-        const allCompletedImages = [...existingImages, ...newImages];
-        console.log('All completed images after merge:', allCompletedImages);
-
-        await updateParticipantProgress(
-          auth.currentUser.uid,
-          participant.nickname,
-          allCompletedImages
-        );
+        // Вызов обновления лидерборда отсюда тоже можно убрать, 
+        // т.к. он теперь делается в App.tsx после updateParticipantProgress
+        // try {
+        //   await updateLeaderboard(...);
+        // } catch (error) { ... }
       }
       
       onComplete({
         correct: finalCorrectAnswers,
         total: session.trials.length,
         totalTimeMs: totalTime
-      });
+      }, completedTrialsData);
       navigate('/completion');
     } else {
       // Обновляем сессию и готовим следующее испытание
@@ -195,10 +186,8 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         startTime: null
       });
 
-      // Сбрасываем lastResponse через 500мс
-      setTimeout(() => {
-        setLastResponse(null);
-      }, 500);
+      // Сразу сбрасываем подсветку кнопок при показе новой картинки
+      setLastResponse(null);
 
       // Разрешаем новые ответы
       setIsProcessingResponse(false);
@@ -229,6 +218,13 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
       return () => clearTimeout(timer);
     }
   }, [trialState?.showImage, session]);
+
+  // Сбрасываем подсветку кнопок при показе изображения
+  useEffect(() => {
+    if (trialState?.showImage) {
+      setLastResponse(null);
+    }
+  }, [trialState?.showImage]);
 
   // Инициализация первого испытания
   useEffect(() => {
@@ -322,7 +318,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        bgcolor: 'grey.200'
+        bgcolor: 'background.default'
       }}
     >
       {/* Прогресс бар */}
@@ -331,7 +327,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           p: 1,
           borderBottom: 1,
           borderColor: 'divider',
-          bgcolor: 'grey.100'
+          bgcolor: 'background.paper'
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -342,7 +338,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
               sx={{ 
                 height: 4, 
                 borderRadius: 1,
-                bgcolor: 'grey.300',
+                bgcolor: 'grey.800',
                 '& .MuiLinearProgress-bar': {
                   bgcolor: 'primary.main'
                 }
@@ -362,18 +358,22 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: 'grey.100'
+          bgcolor: 'background.paper',
+          p: 2
         }}
       >
         {trialState.showImage ? (
           <ImageDisplay imageUrl={trialState.image.url} />
         ) : (
           <Typography 
-            variant="h4" 
-            sx={{ 
-              fontSize: { xs: '28px', sm: '32px' },
+            variant="h4"
+            sx={{
+              fontSize: { xs: '36px', sm: '44px' },
               transition: 'color 0.2s ease',
-              color: wordColor
+              color: wordColor,
+              fontWeight: 500,
+              letterSpacing: 0.5,
+              transform: 'translateY(-100%)',
             }}
           >
             {trialState.trial.word}
@@ -386,7 +386,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         sx={{
           borderTop: 1,
           borderColor: 'divider',
-          bgcolor: 'grey.100',
+          bgcolor: 'background.paper',
           display: 'flex',
           gap: 1,
           p: 1
@@ -400,17 +400,17 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           sx={{
             height: { xs: 56, sm: 'auto' },
             color: lastResponse?.button === 'left' 
-              ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
+              ? (lastResponse.isCorrect ? 'success.light' : 'error.light')
               : 'inherit',
             borderColor: lastResponse?.button === 'left'
-              ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
-              : 'inherit',
-            transition: 'none',
+              ? (lastResponse.isCorrect ? 'success.light' : 'error.light')
+              : 'rgba(255, 255, 255, 0.3)',
+            transition: 'all 0.2s ease',
             '&:hover': {
               borderColor: lastResponse?.button === 'left'
-                ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
-                : 'inherit',
-              transition: 'none'
+                ? (lastResponse.isCorrect ? 'success.light' : 'error.light')
+                : 'rgba(255, 255, 255, 0.5)',
+              bgcolor: 'rgba(30, 30, 30, 0.4)'
             },
             '& .MuiTouchRipple-root': {
               display: 'none'
@@ -427,17 +427,17 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           sx={{
             height: { xs: 56, sm: 'auto' },
             color: lastResponse?.button === 'right'
-              ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
+              ? (lastResponse.isCorrect ? 'success.light' : 'error.light')
               : 'inherit',
             borderColor: lastResponse?.button === 'right'
-              ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
-              : 'inherit',
-            transition: 'none',
+              ? (lastResponse.isCorrect ? 'success.light' : 'error.light')
+              : 'rgba(255, 255, 255, 0.3)',
+            transition: 'all 0.2s ease',
             '&:hover': {
               borderColor: lastResponse?.button === 'right'
-                ? (lastResponse.isCorrect ? 'success.main' : 'error.main')
-                : 'inherit',
-              transition: 'none'
+                ? (lastResponse.isCorrect ? 'success.light' : 'error.light')
+                : 'rgba(255, 255, 255, 0.5)',
+              bgcolor: 'rgba(30, 30, 30, 0.4)'
             },
             '& .MuiTouchRipple-root': {
               display: 'none'

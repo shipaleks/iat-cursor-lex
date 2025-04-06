@@ -1,59 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { Box, TextField, Button, Typography, FormControlLabel, Checkbox, CircularProgress, Dialog, DialogTitle, DialogContent, Table, TableBody, TableCell, TableHead, TableRow, IconButton, Tooltip } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Box, TextField, Button, Typography, Dialog, DialogTitle, DialogContent, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
 import { getParticipantProgressByNickname, getLeaderboard } from '../../firebase/service.tsx';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { useNavigate } from 'react-router-dom';
+import { LeaderboardEntry } from '../../types';
 
 // Функция маскировки никнейма
 const maskNickname = (nickname: string): string => {
   if (!nickname || nickname.length <= 3) return nickname;
-  return `${nickname.slice(0, 2)}${'*'.repeat(3)}${nickname.slice(-1)}`;
+  
+  return `${nickname.slice(0, 2)}${'*'.repeat(nickname.length - 3)}${nickname.slice(-1)}`;
 };
 
 interface NicknameFormProps {
-  onSubmit: (nickname: string, isTestSession: boolean, existingUserId?: string) => void;
+  onSubmit: (nickname: string, isTestSession: boolean) => void;
 }
 
 export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
   const [nickname, setNickname] = useState('');
-  const [isTestSession, setIsTestSession] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!nickname.trim()) {
-      setError('Введите никнейм');
+      setErrorMessage('Пожалуйста, введите ваше имя');
       return;
     }
-
-    setLoading(true);
-    setError(null);
+    
+    setIsLoading(true);
+    setErrorMessage('');
     
     try {
-      // Проверяем, существует ли участник с таким никнеймом
-      const existingParticipant = await getParticipantProgressByNickname(nickname.trim());
-      
-      if (existingParticipant && isTestSession) {
-        setError('Для тестовой сессии, пожалуйста, выберите другой никнейм.');
-        setLoading(false);
-        return;
-      }
-
-      // Передаем existingUserId, если он есть
-      await onSubmit(nickname.trim(), isTestSession, existingParticipant?.userId);
-      navigate('/instructions');
+      // Всегда создаем нового пользователя, независимо от того, 
+      // существует никнейм или нет
+      console.log('Создание новой игровой сессии для никнейма:', nickname);
+      onSubmit(nickname, false);
     } catch (error) {
-      console.error('Error checking nickname:', error);
-      setError('Произошла ошибка при проверке никнейма. Попробуйте еще раз.');
+      console.error('Ошибка при обработке никнейма:', error);
+      setErrorMessage('Произошла ошибка. Пожалуйста, попробуйте еще раз.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
-
+  
+  const handleTestModeClick = () => {
+    if (!nickname.trim()) {
+      setErrorMessage('Пожалуйста, введите ваше имя для тренировки');
+      return;
+    }
+    
+    onSubmit(nickname, true);
+    navigate('/experiment');
+  };
+  
   const loadLeaderboard = async () => {
     try {
       const data = await getLeaderboard();
@@ -61,6 +65,14 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
     } catch (error) {
       console.error('Error loading leaderboard:', error);
     }
+  };
+  
+  // Форматирование времени для отображения
+  const formatTime = (ms: number | undefined): string => {
+    if (!ms) return '0:00';
+    const minutes = Math.floor(ms / (1000 * 60));
+    const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -71,71 +83,64 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
         display: 'flex',
         flexDirection: 'column',
         gap: 3,
-        p: 4,
         width: '100%',
         maxWidth: 400,
-        mx: 'auto'
+        mx: 'auto',
+        p: 3
       }}
     >
-      <Typography variant="h4" align="center" gutterBottom>
-        Добро пожаловать
+      <Typography variant="h5" align="center" gutterBottom>
+        Введите ваше имя
       </Typography>
-
+      
       <TextField
-        label="Ваше имя или никнейм"
-        value={nickname}
-        onChange={(e) => {
-          setNickname(e.target.value);
-          setError(null);
-        }}
-        error={error !== null}
-        helperText={error}
         fullWidth
+        label="Имя"
+        variant="outlined"
+        value={nickname}
+        onChange={(e) => setNickname(e.target.value)}
+        error={!!errorMessage}
+        helperText={errorMessage}
+        disabled={isLoading}
         autoFocus
-        disabled={loading}
       />
-
-      <FormControlLabel
-        control={
-          <Checkbox
-            checked={isTestSession}
-            onChange={(e) => setIsTestSession(e.target.checked)}
-            disabled={loading}
-          />
-        }
-        label="Тестовый раунд (результаты не сохранятся, перезагрузите страницу для полной игры)"
-      />
-
-      <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
-        <Button
-          variant="contained"
-          color="primary"
-          type="submit"
-          disabled={!nickname.trim()}
-        >
-          Продолжить
-        </Button>
-        <Button
-          variant="outlined"
-          color="primary"
-          onClick={() => {
-            loadLeaderboard();
-            setShowLeaderboard(true);
-          }}
-        >
-          Рейтинг игроков
-        </Button>
-      </Box>
-
-      <Dialog
+      
+      <Button 
+        type="submit" 
+        variant="contained" 
+        color="primary"
+        disabled={isLoading}
+        sx={{ py: 1.5 }}
+      >
+        Начать
+      </Button>
+      
+      <Button 
+        variant="outlined"
+        disabled={isLoading}
+        onClick={handleTestModeClick}
+      >
+        Тренировка
+      </Button>
+      
+      <Button 
+        variant="text"
+        onClick={() => {
+          loadLeaderboard();
+          setShowLeaderboard(true);
+        }}
+      >
+        Рейтинг игроков
+      </Button>
+      
+      <Dialog 
         open={showLeaderboard}
         onClose={() => setShowLeaderboard(false)}
         maxWidth="md"
-        fullWidth
       >
-        <DialogTitle>Рейтинг игроков</DialogTitle>
+        <DialogTitle align="center">Рейтинг игроков</DialogTitle>
         <DialogContent>
-          <Table>
+          <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Место</TableCell>
@@ -150,12 +155,13 @@ export const NicknameForm: React.FC<NicknameFormProps> = ({ onSubmit }) => {
                 <TableRow key={entry.nickname}>
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{maskNickname(entry.nickname)}</TableCell>
-                  <TableCell align="right">{entry.accuracy.toFixed(1)}%</TableCell>
                   <TableCell align="right">
-                    {Math.floor(entry.totalTimeMs / (1000 * 60))}:
-                    {String(Math.floor((entry.totalTimeMs % (1000 * 60)) / 1000)).padStart(2, '0')}
+                    {entry.ratingDetails?.accuracy !== undefined ? entry.ratingDetails.accuracy.toFixed(1) : '0.0'}%
                   </TableCell>
-                  <TableCell align="right">{Math.round(entry.score)}</TableCell>
+                  <TableCell align="right">
+                    {formatTime(entry.totalTimeMs)}
+                  </TableCell>
+                  <TableCell align="right">{Math.round(entry.score || 0)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

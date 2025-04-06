@@ -2,67 +2,28 @@ import React, { useState } from 'react';
 import { Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, IconButton } from '@mui/material';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config.tsx';
-import { FACTOR_WORDS } from '../../utils/trialGenerator';
+import { AESTHETIC_WORDS } from '../../utils/wordBank';
 import DownloadIcon from '@mui/icons-material/Download';
 import { WordType } from '../../types';
+import { loadModelDictionary } from '../../utils/trialGenerator';
 
 const PIN = '1921';
 
-interface TrialData {
+interface TrialDataFromFirestore {
   participantId: string;
   participantNickname: string;
   imageFileName: string;
   word: string;
-  wordType: WordType;
+  wordType: WordType | string;
   isCorrect: boolean;
   reactionTimeMs: number;
-  timestamp: Date;
+  timestamp: any;
 }
 
-// Создаем словарь для быстрого поиска фактора и коннотации по слову
-const factorWordMap = FACTOR_WORDS.reduce((acc, fw) => {
-  acc[fw.word] = { factor: fw.factor, connotation: fw.connotation };
+const aestheticWordMap = AESTHETIC_WORDS.reduce((acc, aw) => {
+  acc[aw.word] = { factor: aw.factor, connotation: aw.connotation };
   return acc;
-}, {} as { [key: string]: { factor: string; connotation: string } });
-
-// Загружаем словарь моделей
-async function loadModelDictionary(): Promise<{ [key: string]: string }> {
-  try {
-    console.log('Loading model dictionary...');
-    const response = await fetch('/data/dictionary.tsv');
-    if (!response.ok) {
-      console.error('Failed to load dictionary.tsv:', response.status, response.statusText);
-      throw new Error('Failed to load dictionary.tsv');
-    }
-    
-    const text = await response.text();
-    console.log('Dictionary content:', text.slice(0, 100) + '...'); // Показываем первые 100 символов
-    
-    const rows = text.trim().split('\n').map(row => row.split('\t'));
-    const [header, ...data] = rows;
-    
-    console.log('Header:', header);
-    console.log('First row:', data[0]);
-    
-    // Создаем словарь, где ключ - имя файла, значение - модель
-    const dict = data.reduce((acc, [antonym, concept, model], index) => {
-      // Используем индекс для создания имени файла
-      const key = `${index}.png`;
-      const value = model?.trim() || '';
-      console.log(`Mapping file ${key} to model ${value}`); // Добавляем логирование
-      acc[key] = value;
-      return acc;
-    }, {} as { [key: string]: string });
-    
-    console.log('Dictionary entries:', Object.keys(dict).length);
-    console.log('Sample entries:', Object.entries(dict).slice(0, 3));
-    
-    return dict;
-  } catch (error) {
-    console.error('Error loading model dictionary:', error);
-    return {};
-  }
-}
+}, {} as { [key: string]: { factor: number; connotation: string } });
 
 export function DataExport() {
   const [open, setOpen] = useState(false);
@@ -78,70 +39,14 @@ export function DataExport() {
 
     setLoading(true);
     try {
-      // Загружаем словарь моделей
       const modelDictionary = await loadModelDictionary();
-
-      // Получаем все результаты испытаний
-      const querySnapshot = await getDocs(collection(db, 'trials'));
+      if (Object.keys(modelDictionary).length === 0) {
+        console.error("Failed to load model dictionary for export.");
+        alert("Ошибка: Не удалось загрузить словарь моделей для экспорта.");
+        return;
+      }
       
-      console.log('Model dictionary:', modelDictionary); // Добавляем логирование словаря моделей
-      
-      // Преобразуем данные в строки CSV
-      const headers = [
-        'participantId',
-        'participantNickname',
-        'imageFileName',
-        'model',
-        'word',
-        'wordType',
-        'factor',
-        'connotation',
-        'isCorrect',
-        'reactionTime',
-        'timestamp'
-      ].join(',');
-
-      // Сортируем результаты по времени, чтобы сохранить историю
-      const rows = querySnapshot.docs
-        .map(doc => {
-          const data = doc.data();
-          const factorInfo = factorWordMap[data.word] || { factor: '', connotation: '' };
-          // Добавляем ведущие нули к номеру файла для правильного сопоставления
-          const imageNumber = data.imageFileName.match(/\d+/)?.[0];
-          const paddedImageFileName = imageNumber ? `${imageNumber.padStart(1, '0')}.png` : data.imageFileName;
-          const model = modelDictionary[paddedImageFileName] || '';
-          console.log(`Image ${data.imageFileName} (${paddedImageFileName}) mapped to model: ${model}`); // Обновляем логирование
-
-          return {
-            data: [
-              data.participantId,
-              data.participantNickname,
-              data.imageFileName,
-              model,
-              data.word,
-              data.wordType,
-              data.wordType === 'factor' ? factorInfo.factor : '',
-              data.wordType === 'factor' ? factorInfo.connotation : 
-                (data.wordType === 'target' ? 'positive' : 
-                 data.wordType === 'antonym' ? 'negative' : ''),
-              data.isCorrect,
-              data.reactionTimeMs,
-              data.timestamp?.toDate?.()?.toISOString() || ''
-            ].join(','),
-            timestamp: data.timestamp?.toDate?.() || new Date(0)
-          };
-        })
-        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
-        .map(row => row.data);
-
-      // Создаем и скачиваем файл
-      const csv = [headers, ...rows].join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'experiment_results.csv';
-      link.click();
-
+      await exportTrialsData(modelDictionary);
       setOpen(false);
       setPin('');
       setError(false);
@@ -151,6 +56,82 @@ export function DataExport() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportTrialsData = async (modelDictionary: { [key: string]: string }) => {
+    const sessionsQuerySnapshot = await getDocs(collection(db, 'sessions'));
+    const sessionsMap = new Map();
+    
+    sessionsQuerySnapshot.docs.forEach(doc => {
+      const sessionData = doc.data();
+      const key = `${sessionData.participantId}_${sessionData.nickname}`;
+      if (!sessionsMap.has(key) || sessionData.timestamp.toMillis() > sessionsMap.get(key).timestamp.toMillis()) {
+        sessionsMap.set(key, {
+          deviceType: sessionData.deviceType || 'desktop',
+          timestamp: sessionData.timestamp
+        });
+      }
+    });
+    
+    console.log('Loaded device info from sessions:', sessionsMap.size);
+
+    const querySnapshot = await getDocs(collection(db, 'trials'));
+    
+    console.log('Using pre-loaded model dictionary for export:', modelDictionary);
+    
+    const headers = [
+      'participantId',
+      'participantNickname',
+      'imageFileName',
+      'model',
+      'word',
+      'wordType',
+      'factor',
+      'connotation',
+      'isCorrect',
+      'reactionTimeMs',
+      'deviceType',
+      'timestamp'
+    ].join(',');
+
+    const rows = querySnapshot.docs
+      .map(doc => {
+        const data = doc.data() as TrialDataFromFirestore;
+        const aestheticInfo = aestheticWordMap[data.word] || { factor: '', connotation: '' };
+        
+        const model = modelDictionary[data.imageFileName] || 'not_found';
+        
+        const deviceKey = `${data.participantId}_${data.participantNickname}`;
+        const deviceInfo = sessionsMap.get(deviceKey);
+        const deviceType = deviceInfo ? deviceInfo.deviceType : 'desktop';
+
+        return {
+          data: [
+            data.participantId || '',
+            data.participantNickname || '',
+            data.imageFileName || '',
+            model,
+            data.word || '',
+            data.wordType || '',
+            data.wordType === 'aesthetic' ? aestheticInfo.factor : '',
+            data.wordType === 'aesthetic' ? aestheticInfo.connotation : '',
+            data.isCorrect,
+            data.reactionTimeMs,
+            deviceType,
+            data.timestamp?.toDate?.()?.toISOString() || ''
+          ].map(value => `"${String(value).replace(/"/g, '""' )}"`).join(','),
+          timestamp: data.timestamp?.toDate?.() || new Date(0)
+        };
+      })
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+      .map(row => row.data);
+
+    const csv = [headers, ...rows].join('\n');
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'experiment_results_v2.csv';
+    link.click();
   };
 
   return (
