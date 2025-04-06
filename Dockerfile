@@ -2,6 +2,17 @@ FROM node:16-alpine as build
 
 WORKDIR /app
 
+# Устанавливаем необходимые системные зависимости для canvas
+RUN apk add --no-cache \
+    build-base \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    python3 \
+    pixman-dev
+
 # Копируем package.json и package-lock.json
 COPY package*.json ./
 
@@ -18,6 +29,14 @@ RUN npm run build
 FROM node:16-alpine as production
 
 WORKDIR /app
+
+# Устанавливаем runtime зависимости для canvas
+RUN apk add --no-cache \
+    cairo \
+    jpeg \
+    pango \
+    giflib \
+    pixman
 
 # Копируем только необходимые для запуска файлы
 COPY --from=build /app/dist ./dist
