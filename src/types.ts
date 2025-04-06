@@ -91,10 +91,17 @@ export interface LeaderboardEntry {
 }
 
 export interface RatingCalculation {
-  rating: number;
-  feedbackMessage?: string;
-  roundsCompleted: number;
-  bonusPercentage: number;
+  rating: number; // Базовый рейтинг (0-100)
+  timeScore: number; // Баллы за время (0-15)
+  accuracyMultiplier: number; // Множитель точности (0-1)
+  accuracy: number; // Точность в процентах (0-100)
+  actualTime: number; // Реальное среднее время сессии
+  theoreticalMinTime: number; // Теоретическое мин. время сессии
+  roundsCompleted: number; // Количество завершенных раундов
+  bonusPercentage: number; // Итоговый процент бонуса (100, 105...)
+  roundBonus: number; // Множитель бонуса (1.0, 1.05...)
+  finalScore: number; // Итоговый счет (rating * roundBonus)
+  // feedbackMessage?: string; // Убираем, если не используется
 }
 
 // ... rest of the types ... 

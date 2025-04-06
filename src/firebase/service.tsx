@@ -4,7 +4,7 @@ import { collection, addDoc, setDoc, doc, Timestamp, getDoc, updateDoc, getDocs,
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 // Импортируем типы из глобального файла
-import { TrialResult, ParticipantProgress as ParticipantProgressType, LeaderboardEntry as LeaderboardEntryType, WordType, Trial } from '../types';
+import { TrialResult, ParticipantProgress as ParticipantProgressType, LeaderboardEntry as LeaderboardEntryType, WordType, Trial, RatingCalculation } from '../types';
 
 // Удаляем локальный интерфейс TrialResult
 /*
@@ -33,21 +33,6 @@ interface ParticipantProgress {
 
 // Используем импортированный тип LeaderboardEntryType
 // export interface LeaderboardEntry { ... }
-
-// Определение типа возвращаемого значения
-export interface RatingCalculation {
-  rating: number; // Базовый рейтинг (0-100), основанный только на точности и времени
-  timeScore: number; // Баллы за время (0-15)
-  accuracyMultiplier: number; // Множитель точности (0-1) для расчета очков
-  accuracy: number; // Точность в процентах (0-100)
-  actualTime: number; // Реальное среднее время
-  theoreticalMinTime: number; // Теоретическое мин. время
-  // --- Бонусные поля ---
-  roundsCompleted: number; // Количество завершенных раундов
-  bonusPercentage: number; // Итоговый процент бонуса (100, 105, 110...)
-  roundBonus: number; // Множитель бонуса (1.0, 1.05, 1.10...), рассчитанный из bonusPercentage
-  finalScore: number; // Итоговый счет (rating * roundBonus)
-}
 
 // Выход из системы
 export async function signOutUser() {
