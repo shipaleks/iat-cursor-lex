@@ -38,13 +38,15 @@ RUN apk add --no-cache \
     giflib \
     pixman
 
+# Устанавливаем serve глобально
+RUN npm install -g serve
+
 # Копируем только необходимые для запуска файлы
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./
-COPY --from=build /app/node_modules/serve ./node_modules/serve
 
 # Устанавливаем переменную окружения для порта
 ENV PORT=10000
 
 # Запускаем приложение
-CMD ["npm", "run", "start"] 
+CMD ["serve", "dist", "-s", "-p", "10000"] 
