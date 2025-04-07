@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Typography, LinearProgress, useTheme, useMediaQuery, Button, CircularProgress } from '@mui/material';
 import { ImageDisplay } from './ImageDisplay';
 import { WordDisplay } from './WordDisplay';
@@ -13,8 +13,9 @@ import { getDeviceType } from '../../utils/deviceUtils';
 
 const IMAGE_DISPLAY_TIME = 1000; // ms
 
-// Добавляем константу для высокоточных измерений времени
-const HIGH_PRECISION = 'highp'; // Можно использовать для тегирования высокоточных измерений
+// Глобальная переменная для хранения временной метки начала измерения с максимальной точностью
+// Избегаем использования React state для минимизации задержек
+let precisionStartTimeRef: number | null = null;
 
 interface ExperimentScreenProps {
   participant: {
@@ -38,6 +39,9 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   const [isProcessingResponse, setIsProcessingResponse] = useState(false);
   const [wordColor, setWordColor] = useState<'default' | 'success.main' | 'error.main'>('default');
   const [completedTrialsData, setCompletedTrialsData] = useState<TrialResult[]>([]);
+
+  // Используем useRef для прямого доступа к временной метке без перерендеринга
+  const startTimeRef = useRef<number | null>(null);
 
   // Инициализация сессии
   useEffect(() => {
@@ -82,13 +86,24 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   const handleResponse = async (isWord: boolean) => {
     if (!session || !trialState || trialState.showImage || isProcessingResponse || !participant.userId) return;
 
+    // Мгновенно получаем текущее время с максимальной точностью
+    const preciseEndTime = performance.now();
+    
+    // Рассчитываем реакцию на основе прямых временных меток, минуя React state
+    const actualStartTime = startTimeRef.current || precisionStartTimeRef || 0;
+    const reactionTime = Math.round(preciseEndTime - actualStartTime);
+    
+    // Добавляем отладочный вывод
+    console.log('[TIME] Response received:', { 
+      start: actualStartTime, 
+      end: preciseEndTime, 
+      reaction: reactionTime,
+      stateStartTime: trialState.startTime
+    });
+
     setIsProcessingResponse(true);
     
     const currentTrial = session.trials[session.currentTrialIndex];
-    
-    // Используем Performance API для более точного измерения времени реакции
-    const reactionTime = Math.round(performance.now() - (trialState.startTime || 0));
-    
     const isCorrect = (isWord && currentTrial.wordType !== 'non-word') || 
                      (!isWord && currentTrial.wordType === 'non-word');
 
@@ -284,8 +299,16 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     }
   }, [session, trialState]);
 
-  // Обработка нажатий клавиш
+  // Обновляем обработчик нажатий клавиш для использования специального захвата событий
   const handleKeyPress = useCallback((event: KeyboardEvent) => {
+    // Добавляем флаг, чтобы избежать обработки повторных событий
+    if (event.repeat) return;
+
+    // Получаем время события непосредственно из события DOM
+    const eventTime = performance.now();
+    console.log('[TIME] Key press detected:', event.key, 'at time:', eventTime, 
+      'delta:', precisionStartTimeRef ? (eventTime - precisionStartTimeRef) : 'N/A');
+    
     if (event.key === 'ArrowLeft') {
       handleResponse(false); // НЕ СЛОВО
     } else if (event.key === 'ArrowRight') {
@@ -293,19 +316,37 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     }
   }, [handleResponse]);
 
-  // Управление показом изображения и слова
+  // Регистрируем обработчик нажатий клавиш с флагом захвата (capture)
+  useEffect(() => {
+    // Используем фазу захвата для максимально раннего получения события
+    window.addEventListener('keydown', handleKeyPress, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyPress, { capture: true });
+  }, [handleKeyPress]);
+
+  // Управление показом изображения и слова - модифицируем для использования requestAnimationFrame
   useEffect(() => {
     if (!session || !trialState) return;
 
     if (trialState.showImage) {
       const timer = setTimeout(() => {
-        setTrialState(prev => ({
-          ...prev!,
-          showImage: false,
-          // Используем Performance API для более точного измерения времени начала
-          startTime: performance.now(),
-        }));
+        // Используем requestAnimationFrame для синхронизации с циклом отрисовки
+        requestAnimationFrame(() => {
+          setTrialState(prev => ({
+            ...prev!,
+            showImage: false,
+            // Больше не устанавливаем startTime здесь - это будет делать DOM-обработчик напрямую
+            startTime: null, // Установим временную метку через DOM напрямую
+          }));
+          
+          // Сразу устанавливаем высокоточную метку времени начала
+          precisionStartTimeRef = performance.now();
+          startTimeRef.current = precisionStartTimeRef;
+          
+          // Добавляем отладочный вывод
+          console.log('[TIME] Precision timer started at:', precisionStartTimeRef);
+        });
       }, IMAGE_DISPLAY_TIME);
+      
       return () => clearTimeout(timer);
     }
   }, [trialState?.showImage, session]);
@@ -344,10 +385,15 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     }
   }, [session, trialState?.showImage]);
 
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [handleKeyPress]);
+  // Также модифицируем обработчики кнопок для использования прямых временных меток
+  const handleButtonClick = (isWord: boolean) => {
+    // Мгновенно получаем время клика напрямую, минуя React state
+    const clickTime = performance.now();
+    console.log('[TIME] Button click detected at:', clickTime, 
+      'delta:', precisionStartTimeRef ? (clickTime - precisionStartTimeRef) : 'N/A');
+    
+    handleResponse(isWord);
+  };
 
   if (!session || !trialState) {
     return (
@@ -487,7 +533,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           variant="outlined"
           fullWidth
           startIcon={<KeyboardArrowLeft />}
-          onClick={() => handleResponse(false)}
+          onClick={() => handleButtonClick(false)}
           sx={{
             height: { xs: 56, sm: 'auto' },
             color: lastResponse?.button === 'left' 
@@ -514,7 +560,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
           variant="outlined"
           fullWidth
           endIcon={<KeyboardArrowRight />}
-          onClick={() => handleResponse(true)}
+          onClick={() => handleButtonClick(true)}
           sx={{
             height: { xs: 56, sm: 'auto' },
             color: lastResponse?.button === 'right'
