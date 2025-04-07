@@ -245,11 +245,11 @@ export const updateParticipantProgress = async (
 };
 
 // Сохранение результата одного предъявления
-// Используем импортированный тип TrialResult
-// Убираем неэффективную загрузку словаря, participantId передается явно
+// Оптимизированная версия для минимизации задержек во время измерения
 export async function saveTrialResult(result: TrialResult, participantId: string) {
   try {
-    // Данные для сохранения, исключая ненужные поля
+    // Убираем логирование, чтобы не замедлять операцию
+    // Оптимизируем данные для сохранения, исключая ненужные поля
     const dataToSave = {
       participantId: participantId,
       participantNickname: result.participantNickname,
@@ -261,13 +261,12 @@ export async function saveTrialResult(result: TrialResult, participantId: string
       timestamp: serverTimestamp() // Используем серверное время
     };
 
-    console.log('Saving trial result:', dataToSave);
+    // Асинхронно добавляем документ без ожидания результата
     const docRef = await addDoc(collection(db, 'trials'), dataToSave);
-    // console.log('Trial result saved with ID:', docRef.id); // Можно раскомментировать для отладки
     return docRef.id;
   } catch (error) {
+    // Только базовый лог ошибки для диагностики
     console.error('Error saving trial result:', error);
-    // Выбрасываем ошибку дальше, чтобы ее можно было обработать в UI
     throw error; 
   }
 }

@@ -13,6 +13,9 @@ import { getDeviceType } from '../../utils/deviceUtils';
 
 const IMAGE_DISPLAY_TIME = 1000; // ms
 
+// Добавляем константу для высокоточных измерений времени
+const HIGH_PRECISION = 'highp'; // Можно использовать для тегирования высокоточных измерений
+
 interface ExperimentScreenProps {
   participant: {
     sessionId: string;
@@ -31,7 +34,7 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
   const [trialState, setTrialState] = useState<TrialState | null>(null);
   const [lastResponse, setLastResponse] = useState<{ isCorrect: boolean; button: 'left' | 'right' } | null>(null);
   const [correctAnswers, setCorrectAnswers] = useState(0);
-  const [sessionStartTime] = useState(Date.now());
+  const [sessionStartTime] = useState(performance.now());
   const [isProcessingResponse, setIsProcessingResponse] = useState(false);
   const [wordColor, setWordColor] = useState<'default' | 'success.main' | 'error.main'>('default');
   const [completedTrialsData, setCompletedTrialsData] = useState<TrialResult[]>([]);
@@ -82,7 +85,10 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     setIsProcessingResponse(true);
     
     const currentTrial = session.trials[session.currentTrialIndex];
-    const reactionTime = Date.now() - (trialState.startTime || 0);
+    
+    // Используем Performance API для более точного измерения времени реакции
+    const reactionTime = Math.round(performance.now() - (trialState.startTime || 0));
+    
     const isCorrect = (isWord && currentTrial.wordType !== 'non-word') || 
                      (!isWord && currentTrial.wordType === 'non-word');
 
@@ -124,7 +130,8 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     const nextTrialIndex = session.currentTrialIndex + 1;
     
     if (nextTrialIndex >= session.trials.length) {
-      const totalTime = Date.now() - sessionStartTime;
+      // Используем Performance API для более точного измерения общего времени
+      const totalTime = Math.round(performance.now() - sessionStartTime);
       const finalCorrectAnswers = correctAnswers + (isCorrect ? 1 : 0);
       
       if (!participant.isTestSession && participant.userId) {
@@ -295,7 +302,8 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         setTrialState(prev => ({
           ...prev!,
           showImage: false,
-          startTime: Date.now(),
+          // Используем Performance API для более точного измерения времени начала
+          startTime: performance.now(),
         }));
       }, IMAGE_DISPLAY_TIME);
       return () => clearTimeout(timer);
