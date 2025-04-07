@@ -1129,19 +1129,19 @@ const ALL_REAL_WORDS_FOR_CHECK = new Set([
     ...EXTERNAL_SIMILAR_ADVERBS.map(w => w.toLowerCase())
 ]);
 
-const DICTIONARY_PATH = '/data/dictionary_v2.tsv';
+const DICTIONARY_PATH = '/data/exp2_samples.csv';
 let modelDictionaryCache: { [key: string]: string } | null = null;
 
-// Функция загрузки словаря моделей (перенесена и добавлено кеширование)
+// Функция загрузки словаря моделей (обновлена для CSV вместо TSV)
 export async function loadModelDictionary(): Promise<{ [key: string]: string }> {
   // Если словарь уже в кеше, возвращаем его
   if (modelDictionaryCache) {
-    console.log('Returning cached model dictionary v2.');
+    console.log('Returning cached model dictionary.');
     return modelDictionaryCache;
   }
 
   try {
-    console.log('Loading model dictionary v2 from:', DICTIONARY_PATH);
+    console.log('Loading model dictionary from:', DICTIONARY_PATH);
     const response = await fetch(DICTIONARY_PATH);
     if (!response.ok) {
       console.error(`Failed to load ${DICTIONARY_PATH}:`, response.status, response.statusText);
@@ -1149,31 +1149,65 @@ export async function loadModelDictionary(): Promise<{ [key: string]: string }> 
     }
     
     const text = await response.text();
-    console.log('Dictionary v2 content received (first 100 chars):', text.slice(0, 100) + '...');
+    console.log('Dictionary content received (first 100 chars):', text.slice(0, 100) + '...');
     
-    const rows = text.trim().split('\n').map(row => row.split('\t'));
+    // Парсим CSV (разделитель запятая)
+    const rows = text.trim().split('\n').map(row => {
+      // Учитываем возможные запятые внутри кавычек
+      const result = [];
+      let inQuotes = false;
+      let currentValue = '';
+      
+      for (let i = 0; i < row.length; i++) {
+        const char = row[i];
+        
+        if (char === '"' && (i === 0 || row[i - 1] !== '\\')) {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(currentValue);
+          currentValue = '';
+        } else {
+          currentValue += char;
+        }
+      }
+      
+      result.push(currentValue); // Добавляем последнее значение
+      return result;
+    });
+    
+    // Пропускаем заголовок и получаем индексы нужных колонок
+    const headers = rows[0];
+    const fileNameIndex = headers.findIndex(h => h.trim() === 'file_name');
+    const modelNameIndex = headers.findIndex(h => h.trim() === 'model_name');
+    
+    if (fileNameIndex === -1 || modelNameIndex === -1) {
+      console.error('Required columns not found in the CSV file:', headers);
+      throw new Error('Invalid CSV format: missing required columns');
+    }
+    
     // Пропускаем заголовок
     const data = rows.slice(1); 
     
     const dict = data.reduce((acc, row) => {
-      const fileName = row[0]?.trim(); // Первая колонка - fileName
-      const model = row[1]?.trim();    // Вторая колонка - model
+      const fileName = row[fileNameIndex]?.trim(); // file_name
+      const model = row[modelNameIndex]?.trim();   // model_name
+      
       if (fileName && model) {
         acc[fileName] = model;
       } else {
         // Логируем, если строка некорректна, но не прерываем процесс
-        console.warn('Skipping invalid row in dictionary v2:', row);
+        console.warn('Skipping invalid row in dictionary:', row);
       }
       return acc;
     }, {} as { [key: string]: string });
     
-    console.log('Dictionary v2 loaded successfully. Entries:', Object.keys(dict).length);
+    console.log('Dictionary loaded successfully. Entries:', Object.keys(dict).length);
     
     // Сохраняем в кеш
     modelDictionaryCache = dict; 
     return dict;
   } catch (error) {
-    console.error('Error loading model dictionary v2:', error);
+    console.error('Error loading model dictionary:', error);
     // Возвращаем пустой объект в случае ошибки, чтобы не блокировать остальную логику
     return {}; 
   }
