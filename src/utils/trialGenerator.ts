@@ -1232,75 +1232,40 @@ export async function loadImages(): Promise<ImageData[]> {
     
     const foundImages: ImageData[] = [];
     
-    // Проверяем файлы от 0.png до 999.png
-    for (let i = 0; i < 1000; i++) {
+    // Улучшенный метод: создаем метаданные изображений без их предварительной загрузки
+    // Проверяем файлы от 0.png до 599.png (или сколько есть в CSV)
+    const maxIndex = 600; // Ограничиваем до 600 файлов для оптимизации
+    
+    for (let i = 0; i < maxIndex; i++) {
       const fileName = `${i}.png`;
-      const img = new Image();
       
-      await new Promise<void>((resolve) => {
-        img.onload = () => {
-          // Изображение успешно загружено
-          
-          // Определяем модель ИЗ СЛОВАРЯ
-          const model = modelDictionary[fileName] || 'unknown_model'; // Используем fallback
-          if (model === 'unknown_model') {
-            console.warn(`Model not found in dictionary for image: ${fileName}`);
-          }
-          
-          foundImages.push({
-            id: String(i),
-            fileName: fileName,
-            url: `${imagesPath}/${fileName}`,
-            model: model, // Используем модель из словаря
-            target: 'not_used', // Эти поля больше не нужны, но оставим для совместимости
-            antonym: 'not_used'
-          });
-          resolve();
-        };
-        img.onerror = () => {
-          resolve();
-        };
-        
-        const timestamp = new Date().getTime();
-        img.src = `${imagesPath}/${fileName}?nocache=${timestamp}`;
-      });
-      
-      // Если нашли достаточно изображений и последнее не загрузилось,
-      // вероятно, достигли конца последовательности
-      if (foundImages.length > 0 && foundImages[foundImages.length - 1]?.id !== String(i)) {
-        // Проверим еще 5 индексов, чтобы убедиться, что не пропустили изображения
-        let foundMore = false;
-        for (let j = 1; j <= 5; j++) {
-          const nextIdx = i + j;
-          const nextImg = new Image();
-          await new Promise<void>(resolve => {
-            nextImg.onload = () => {
-              foundMore = true;
-              resolve();
-            };
-            nextImg.onerror = () => resolve();
-            // Создаем новый timestamp для каждого запроса
-            const checkTimestamp = new Date().getTime();
-            nextImg.src = `${imagesPath}/${nextIdx}.png?t=${checkTimestamp}`;
-          });
-          if (foundMore) break;
-        }
-        
-        // Если не нашли больше изображений, завершаем поиск
-        if (!foundMore) break;
+      // Определяем модель из словаря (без загрузки изображения)
+      const model = modelDictionary[fileName] || 'unknown_model';
+      if (model === 'unknown_model') {
+        console.warn(`Model not found in dictionary for image: ${fileName}`);
       }
+      
+      // Добавляем метаданные без предварительной загрузки изображения
+      foundImages.push({
+        id: String(i),
+        fileName: fileName,
+        url: `${imagesPath}/${fileName}`,
+        model: model,
+        target: 'not_used',
+        antonym: 'not_used'
+      });
     }
     
     if (foundImages.length === 0) {
-      throw new Error('No images found in the images directory');
+      throw new Error('No images metadata could be created');
     }
     
     IMAGES = foundImages;
-    console.log(`Successfully loaded ${IMAGES.length} images directly from the images directory`);
+    console.log(`Successfully loaded metadata for ${IMAGES.length} images`);
     return IMAGES;
   } catch (error) {
-    console.error('Error loading images:', error);
-    throw new Error(`Failed to load images: ${error}`);
+    console.error('Error loading images metadata:', error);
+    throw new Error(`Failed to load images metadata: ${error}`);
   }
 }
 
@@ -1936,16 +1901,37 @@ function createTrialsForImage(image: ImageData): Trial[] {
   return shuffle(trials);
 }
 
-// Функция для предварительной загрузки изображений
-function preloadImages(imageUrls: string[]): Promise<void> {
-  return Promise.all(imageUrls.map(url => {
-    return new Promise<void>((resolve, reject) => {
-      const img = new Image();
-      img.src = url;
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-    });
-  })).then(() => {});
+// Функция для предварительной загрузки только нужных изображений
+async function preloadImages(imageUrls: string[]): Promise<void> {
+  console.log(`Preloading ${imageUrls.length} images for current session...`);
+  let loadedCount = 0;
+  
+  try {
+    await Promise.all(imageUrls.map(url => {
+      return new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          loadedCount++;
+          // Логируем прогресс каждые 10 изображений
+          if (loadedCount % 10 === 0) {
+            console.log(`Preloaded ${loadedCount}/${imageUrls.length} images`);
+          }
+          resolve();
+        };
+        img.onerror = () => {
+          console.warn(`Failed to preload image: ${url}`);
+          resolve(); // Резолвим даже при ошибке, чтобы не блокировать весь процесс
+        };
+        // Добавляем временную метку для предотвращения кеширования
+        const timestamp = new Date().getTime();
+        img.src = `${url}?t=${timestamp}`;
+      });
+    }));
+    
+    console.log(`Successfully preloaded ${loadedCount}/${imageUrls.length} images for the session`);
+  } catch (error) {
+    console.error('Error during image preloading:', error);
+  }
 }
 
 // Увеличиваем количество изображений в сессии для ещё большего разнообразия
@@ -2109,13 +2095,13 @@ export async function createSession(
   
   console.log("Final selection contains:", selectedImagesForSession.length, "unique images");
 
-  // Предварительная загрузка выбранных изображений
+  // Предварительная загрузка ТОЛЬКО выбранных изображений
   const imageUrls = selectedImagesForSession.map(img => img.url);
   try {
-  await preloadImages(imageUrls);
-    console.log('Selected images preloaded.');
+    await preloadImages(imageUrls);
+    console.log('Selected images preloaded for current session.');
   } catch (error) {
-    console.error('Error preloading images:', error);
+    console.error('Error preloading session images:', error);
   }
 
   // НОВОЕ: Отслеживаем слова, использованные в текущей сессии

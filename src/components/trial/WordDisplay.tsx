@@ -3,9 +3,10 @@ import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
 
 interface WordDisplayProps {
   word: string;
+  color?: 'default' | 'success.main' | 'error.main';
 }
 
-export const WordDisplay: React.FC<WordDisplayProps> = ({ word }) => {
+export const WordDisplay: React.FC<WordDisplayProps> = ({ word, color = 'default' }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -30,6 +31,8 @@ export const WordDisplay: React.FC<WordDisplayProps> = ({ word }) => {
           userSelect: 'none',
           wordBreak: 'break-word',
           maxWidth: '100%',
+          color: color,
+          transition: 'color 0.2s ease',
         }}
       >
         {word}

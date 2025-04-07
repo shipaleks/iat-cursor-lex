@@ -66,6 +66,7 @@ export interface TrialState {
   showWord: boolean;
   lastResponse: { isCorrect: boolean; buttonPressed: 'left' | 'right' } | null;
   startTime: number | null;
+  preloadedImage?: HTMLImageElement | null;
 }
 
 export interface ParticipantProgress {

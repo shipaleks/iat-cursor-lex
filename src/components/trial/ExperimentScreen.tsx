@@ -176,23 +176,106 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         completedTrials: prev.completedTrials + 1
       } : null);
 
-      // Обновляем состояние испытания
-      setTrialState({
-        trial: nextTrial,
-        image: nextImage,
-        showImage: true,
-        showWord: false,
-        lastResponse: null,
-        startTime: null
-      });
+      // Предзагружаем изображение перед показом
+      const preloadImage = new Image();
+      let loadStarted = false;
 
-      // Сразу сбрасываем подсветку кнопок при показе новой картинки
-      setLastResponse(null);
+      preloadImage.onload = () => {
+        console.log(`Next image (${nextImage.fileName}) preloaded successfully`);
+        
+        // Устанавливаем состояние только если загрузка не началась ранее
+        if (!loadStarted) {
+          loadStarted = true;
+          
+          // Обновляем состояние испытания с предзагруженным изображением
+          setTrialState({
+            trial: nextTrial,
+            image: nextImage,
+            showImage: true,
+            showWord: false,
+            lastResponse: null,
+            startTime: null,
+            preloadedImage: preloadImage
+          });
+          
+          // Сбрасываем подсветку кнопок при показе новой картинки
+          setLastResponse(null);
+          
+          // Разрешаем новые ответы
+          setIsProcessingResponse(false);
+        }
+      };
 
-      // Разрешаем новые ответы
-      setIsProcessingResponse(false);
+      preloadImage.onerror = () => {
+        console.error(`Failed to preload next image: ${nextImage.url}`);
+        // В случае ошибки все равно показываем, но без предзагрузки
+        if (!loadStarted) {
+          loadStarted = true;
+          
+          setTrialState({
+            trial: nextTrial,
+            image: nextImage,
+            showImage: true,
+            showWord: false,
+            lastResponse: null,
+            startTime: null,
+            preloadedImage: null
+          });
+          
+          setLastResponse(null);
+          setIsProcessingResponse(false);
+        }
+      };
+
+      // Добавляем временную метку для предотвращения кеширования
+      const timestamp = new Date().getTime();
+      preloadImage.src = `${nextImage.url}?t=${timestamp}`;
     }
   };
+
+  // Инициализация первого испытания
+  useEffect(() => {
+    if (session && !trialState) {
+      console.log('Initializing first trial');
+      const firstTrial = session.trials[0];
+      const firstImage = IMAGES.find(img => img.id === firstTrial.imageId)!;
+      
+      console.log('First trial:', firstTrial);
+      console.log('First image:', firstImage);
+      
+      // Предзагружаем изображение перед показом
+      const preloadImage = new Image();
+      preloadImage.onload = () => {
+        console.log('First image preloaded successfully');
+        // Устанавливаем состояние только когда изображение загружено
+        setTrialState({
+          trial: firstTrial,
+          image: firstImage,
+          showImage: true,
+          showWord: false,
+          lastResponse: null,
+          startTime: null,
+          preloadedImage: preloadImage // Сохраняем предзагруженное изображение
+        });
+      };
+      preloadImage.onerror = () => {
+        console.error('Failed to preload first image:', firstImage.url);
+        // В случае ошибки все равно показываем, но без предзагрузки
+        setTrialState({
+          trial: firstTrial,
+          image: firstImage,
+          showImage: true,
+          showWord: false,
+          lastResponse: null,
+          startTime: null
+        });
+      };
+      
+      // Добавляем временную метку для предотвращения кеширования
+      const timestamp = new Date().getTime();
+      preloadImage.src = `${firstImage.url}?t=${timestamp}`;
+    }
+  }, [session, trialState]);
 
   // Обработка нажатий клавиш
   const handleKeyPress = useCallback((event: KeyboardEvent) => {
@@ -226,26 +309,32 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
     }
   }, [trialState?.showImage]);
 
-  // Инициализация первого испытания
+  // Предзагрузка следующего изображения после показа текущего
   useEffect(() => {
-    if (session && !trialState) {
-      console.log('Initializing first trial');
-      const firstTrial = session.trials[0];
-      const firstImage = IMAGES.find(img => img.id === firstTrial.imageId)!;
+    if (!session || !trialState || trialState.showImage) return;
+    
+    // Если есть следующее испытание, предзагружаем его изображение
+    const nextTrialIndex = session.currentTrialIndex + 1;
+    if (nextTrialIndex < session.trials.length) {
+      const nextTrial = session.trials[nextTrialIndex];
+      const nextImage = IMAGES.find(img => img.id === nextTrial.imageId);
       
-      console.log('First trial:', firstTrial);
-      console.log('First image:', firstImage);
-      
-      setTrialState({
-        trial: firstTrial,
-        image: firstImage,
-        showImage: true,
-        showWord: false,
-        lastResponse: null,
-        startTime: null
-      });
+      if (nextImage) {
+        // Создаем новый элемент изображения для предзагрузки
+        const preloadNextImage = new Image();
+        preloadNextImage.onload = () => {
+          console.log(`Next image (${nextImage.fileName}) preloaded successfully`);
+        };
+        preloadNextImage.onerror = () => {
+          console.warn(`Failed to preload next image: ${nextImage.url}`);
+        };
+        
+        // Добавляем временную метку для предотвращения кеширования
+        const timestamp = new Date().getTime();
+        preloadNextImage.src = `${nextImage.url}?t=${timestamp}`;
+      }
     }
-  }, [session, trialState]);
+  }, [session, trialState?.showImage]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyPress);
@@ -363,21 +452,15 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         }}
       >
         {trialState.showImage ? (
-          <ImageDisplay imageUrl={trialState.image.url} />
+          <ImageDisplay 
+            imageUrl={trialState.image.url} 
+            preloadedImage={trialState.preloadedImage} 
+          />
         ) : (
-          <Typography 
-            variant="h4"
-            sx={{
-              fontSize: { xs: '36px', sm: '44px' },
-              transition: 'color 0.2s ease',
-              color: wordColor,
-              fontWeight: 500,
-              letterSpacing: 0.5,
-              transform: 'translateY(-100%)',
-            }}
-          >
-            {trialState.trial.word}
-          </Typography>
+          <WordDisplay 
+            word={trialState.trial.word} 
+            color={wordColor}
+          />
         )}
       </Box>
 

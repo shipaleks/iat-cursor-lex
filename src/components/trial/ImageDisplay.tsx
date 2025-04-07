@@ -3,11 +3,14 @@ import { Box, useTheme, useMediaQuery, Paper } from '@mui/material';
 
 interface ImageDisplayProps {
   imageUrl: string;
+  preloadedImage?: HTMLImageElement | null;
 }
 
-export const ImageDisplay: React.FC<ImageDisplayProps> = ({ imageUrl }) => {
+export const ImageDisplay: React.FC<ImageDisplayProps> = ({ imageUrl, preloadedImage }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const imageSource = preloadedImage ? preloadedImage.src : imageUrl;
 
   return (
     <Box
@@ -42,7 +45,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({ imageUrl }) => {
       >
         <Box
           component="img"
-          src={imageUrl}
+          src={imageSource}
           alt="Stimulus"
           sx={{
             display: 'block',
