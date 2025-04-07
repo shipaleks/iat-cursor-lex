@@ -301,8 +301,8 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
 
   // Обновляем обработчик нажатий клавиш для использования специального захвата событий
   const handleKeyPress = useCallback((event: KeyboardEvent) => {
-    // Добавляем флаг, чтобы избежать обработки повторных событий
-    if (event.repeat) return;
+    // Удаляем проверку event.repeat, чтобы разрешить автоповтор при зажатии клавиши
+    // if (event.repeat) return;
 
     // Получаем время события непосредственно из события DOM
     const eventTime = performance.now();
