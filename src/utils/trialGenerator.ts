@@ -1132,7 +1132,7 @@ const ALL_REAL_WORDS_FOR_CHECK = new Set([
 const DICTIONARY_PATH = '/data/exp2_samples.csv';
 let modelDictionaryCache: { [key: string]: string } | null = null;
 
-// Функция загрузки словаря моделей (обновлена для CSV вместо TSV)
+// Функция загрузки словаря моделей (обновлена для лучшей обработки CSV)
 export async function loadModelDictionary(): Promise<{ [key: string]: string }> {
   // Если словарь уже в кеше, возвращаем его
   if (modelDictionaryCache) {
@@ -1151,31 +1151,56 @@ export async function loadModelDictionary(): Promise<{ [key: string]: string }> 
     const text = await response.text();
     console.log('Dictionary content received (first 100 chars):', text.slice(0, 100) + '...');
     
-    // Парсим CSV (разделитель запятая)
-    const rows = text.trim().split('\n').map(row => {
-      // Учитываем возможные запятые внутри кавычек
-      const result = [];
+    // Усовершенствованный парсер CSV, работающий с кавычками и переносами строк внутри полей
+    const parseCSV = (text: string): string[][] => {
+      const rows: string[][] = [];
+      let row: string[] = [];
       let inQuotes = false;
       let currentValue = '';
       
-      for (let i = 0; i < row.length; i++) {
-        const char = row[i];
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
         
-        if (char === '"' && (i === 0 || row[i - 1] !== '\\')) {
-          inQuotes = !inQuotes;
+        if (char === '"') {
+          // Проверяем на экранированную кавычку (двойная кавычка внутри поля)
+          if (i + 1 < text.length && text[i + 1] === '"') {
+            currentValue += '"';
+            i++; // Пропускаем вторую кавычку
+          } else {
+            // Переключаем состояние кавычек
+            inQuotes = !inQuotes;
+          }
         } else if (char === ',' && !inQuotes) {
-          result.push(currentValue);
+          // Запятая вне кавычек - конец ячейки
+          row.push(currentValue);
           currentValue = '';
+        } else if (char === '\n' && !inQuotes) {
+          // Новая строка вне кавычек - конец строки
+          row.push(currentValue);
+          rows.push(row);
+          row = [];
+          currentValue = '';
+        } else if (char === '\r') {
+          // Игнорируем возврат каретки
+          continue;
         } else {
+          // Добавляем символ в текущее значение
           currentValue += char;
         }
       }
       
-      result.push(currentValue); // Добавляем последнее значение
-      return result;
-    });
+      // Добавляем последнюю ячейку и строку, если они есть
+      if (currentValue !== '' || row.length > 0) {
+        row.push(currentValue);
+        rows.push(row);
+      }
+      
+      return rows;
+    };
     
-    // Пропускаем заголовок и получаем индексы нужных колонок
+    const rows = parseCSV(text);
+    
+    // Получаем индексы нужных колонок из заголовка
     const headers = rows[0];
     const fileNameIndex = headers.findIndex(h => h.trim() === 'file_name');
     const modelNameIndex = headers.findIndex(h => h.trim() === 'model_name');
@@ -1188,7 +1213,13 @@ export async function loadModelDictionary(): Promise<{ [key: string]: string }> 
     // Пропускаем заголовок
     const data = rows.slice(1); 
     
+    // Строим словарь моделей
     const dict = data.reduce((acc, row) => {
+      if (row.length <= Math.max(fileNameIndex, modelNameIndex)) {
+        console.warn('Skipping incomplete row in dictionary:', row);
+        return acc;
+      }
+      
       const fileName = row[fileNameIndex]?.trim(); // file_name
       const model = row[modelNameIndex]?.trim();   // model_name
       
@@ -1202,6 +1233,16 @@ export async function loadModelDictionary(): Promise<{ [key: string]: string }> 
     }, {} as { [key: string]: string });
     
     console.log('Dictionary loaded successfully. Entries:', Object.keys(dict).length);
+    
+    // Для отладки: проверим конкретные файлы из CSV
+    const filesToDebug = ['17.png', '19.png', '32.png'];
+    filesToDebug.forEach(file => {
+      if (dict[file]) {
+        console.log(`File ${file} has model: ${dict[file]}`);
+      } else {
+        console.warn(`File ${file} NOT FOUND in dictionary!`);
+      }
+    });
     
     // Сохраняем в кеш
     modelDictionaryCache = dict; 
@@ -1225,24 +1266,31 @@ export async function loadImages(): Promise<ImageData[]> {
   
   // Загружаем словарь моделей перед поиском изображений
   const modelDictionary = await loadModelDictionary();
+  console.log(`Loaded model dictionary with ${Object.keys(modelDictionary).length} entries`);
 
   try {
     const imagesPath = '/images';
-    console.log('Loading images directly from', imagesPath);
+    console.log('Loading images metadata from', imagesPath);
     
     const foundImages: ImageData[] = [];
     
     // Улучшенный метод: создаем метаданные изображений без их предварительной загрузки
     // Проверяем файлы от 0.png до 599.png (или сколько есть в CSV)
     const maxIndex = 600; // Ограничиваем до 600 файлов для оптимизации
+    let missingModelCount = 0;
     
     for (let i = 0; i < maxIndex; i++) {
       const fileName = `${i}.png`;
       
       // Определяем модель из словаря (без загрузки изображения)
-      const model = modelDictionary[fileName] || 'unknown_model';
-      if (model === 'unknown_model') {
-        console.warn(`Model not found in dictionary for image: ${fileName}`);
+      let model = modelDictionary[fileName];
+      
+      if (!model) {
+        missingModelCount++;
+        if (missingModelCount <= 10) {
+          console.warn(`Model not found in dictionary for image: ${fileName}`);
+        }
+        model = 'unknown_model'; // Устанавливаем значение по умолчанию
       }
       
       // Добавляем метаданные без предварительной загрузки изображения
@@ -1260,7 +1308,23 @@ export async function loadImages(): Promise<ImageData[]> {
       throw new Error('No images metadata could be created');
     }
     
+    if (missingModelCount > 0) {
+      console.warn(`Total files without model info: ${missingModelCount}`);
+    }
+    
     IMAGES = foundImages;
+    
+    // Анализируем информацию о моделях
+    const modelsCount: {[key: string]: number} = {};
+    IMAGES.forEach(img => {
+      modelsCount[img.model] = (modelsCount[img.model] || 0) + 1;
+    });
+    
+    console.log("Models distribution:");
+    Object.entries(modelsCount).forEach(([model, count]) => {
+      console.log(`  ${model}: ${count} images`);
+    });
+    
     console.log(`Successfully loaded metadata for ${IMAGES.length} images`);
     return IMAGES;
   } catch (error) {
