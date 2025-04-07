@@ -58,6 +58,15 @@ export function DataExport() {
     }
   };
 
+  // Нормализация промпта для более надежного сопоставления
+  const normalizePrompt = (prompt: string): string => {
+    return prompt
+      .replace(/\s+/g, ' ')  // заменяем множественные пробелы на один
+      .replace(/\n+/g, ' ')  // заменяем переносы строк на пробелы
+      .trim()                // убираем пробелы по краям
+      .toLowerCase();        // приводим к нижнему регистру для case-insensitive сравнения
+  };
+
   const exportTrialsData = async (modelDictionary: { [key: string]: string }) => {
     try {
       // Загружаем данные о промптах и файлах
@@ -72,34 +81,69 @@ export function DataExport() {
       const filesByPrompt: { [prompt: string]: string[] } = {};
       const modelByFile: { [fileName: string]: string } = {};
       
-      // Пропускаем заголовок
-      const lines = csvText.split('\n').slice(1);
-      
-      for (const line of lines) {
-        // Парсим CSV с учетом кавычек
-        let inQuotes = false;
-        let fields: string[] = [];
-        let currentField = "";
+      // Используем более надежный подход к парсингу CSV
+      const parseCSV = (text: string): string[][] => {
+        const lines = text.split('\n');
+        const result: string[][] = [];
         
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          if (char === '"' && (i === 0 || line[i-1] !== '\\')) {
-            inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
-            fields.push(currentField);
-            currentField = "";
-          } else {
-            currentField += char;
-          }
-        }
-        fields.push(currentField); // Добавляем последнее поле
-        
-        // Структура CSV: index,prompt,model_name,file_name
-        if (fields.length >= 4) {
-          const prompt = fields[1].trim().replace(/^"|"$/g, '');
-          const model = fields[2].trim();
-          const fileName = fields[3].trim();
+        for (const line of lines) {
+          const row: string[] = [];
+          let cell = '';
+          let inQuotes = false;
           
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            
+            if (char === '"') {
+              // Если это не экранированная кавычка
+              if (i + 1 < line.length && line[i + 1] === '"') {
+                // Двойная кавычка внутри кавычек - это экранированная кавычка
+                cell += '"';
+                i++; // пропускаем следующую кавычку
+              } else {
+                inQuotes = !inQuotes;
+              }
+            } else if (char === ',' && !inQuotes) {
+              row.push(cell);
+              cell = '';
+            } else {
+              cell += char;
+            }
+          }
+          
+          row.push(cell); // Добавляем последнюю ячейку
+          result.push(row);
+        }
+        
+        return result;
+      };
+      
+      const csvRows = parseCSV(csvText);
+      
+      // Получаем индексы нужных колонок из заголовка
+      const csvHeaders = csvRows[0];
+      const promptIndex = csvHeaders.findIndex(h => h.trim() === 'prompt');
+      const modelIndex = csvHeaders.findIndex(h => h.trim() === 'model_name');
+      const fileNameIndex = csvHeaders.findIndex(h => h.trim() === 'file_name');
+      
+      if (promptIndex === -1 || modelIndex === -1 || fileNameIndex === -1) {
+        console.error('Required columns not found in CSV:', csvHeaders);
+        throw new Error('Invalid CSV format');
+      }
+      
+      // Заполняем структуры данных
+      for (let i = 1; i < csvRows.length; i++) {
+        const row = csvRows[i];
+        if (row.length <= Math.max(promptIndex, modelIndex, fileNameIndex)) {
+          console.warn(`Skipping incomplete row: ${row}`);
+          continue;
+        }
+        
+        const prompt = normalizePrompt(row[promptIndex]);
+        const model = row[modelIndex].trim();
+        const fileName = row[fileNameIndex].trim();
+        
+        if (prompt && model && fileName) {
           promptByFile[fileName] = prompt;
           modelByFile[fileName] = model;
           
@@ -109,6 +153,24 @@ export function DataExport() {
           filesByPrompt[prompt].push(fileName);
         }
       }
+      
+      // Добавление информации об отдельных парах для отладки
+      console.log('Checking specific files:');
+      const checkSpecificFile = (fileName: string) => {
+        const prompt = promptByFile[fileName];
+        console.log(`File ${fileName}:`);
+        console.log(`  Prompt: "${prompt?.substring(0, 100)}..."`);
+        console.log(`  Model: ${modelByFile[fileName]}`);
+        if (prompt) {
+          console.log(`  Files with same prompt: ${filesByPrompt[prompt].join(', ')}`);
+        } else {
+          console.log(`  No prompt found for this file`);
+        }
+      };
+      
+      // Проверяем конкретные файлы
+      checkSpecificFile('54.png');
+      checkSpecificFile('495.png');
       
       // Анализ промптов и моделей
       const promptsWithSingleModel = new Set<string>();
@@ -127,9 +189,19 @@ export function DataExport() {
       
       // Список проблемных файлов (без пар)
       const filesWithoutPairs = new Set<string>();
+      const manualPairs: { [key: string]: string } = {
+        '54.png': '495.png',
+        '495.png': '54.png',
+        // Добавьте другие известные пары здесь при необходимости
+      };
       
       // Функция для поиска ассоциированного файла
       const findAssociatedFile = (fileName: string): string => {
+        // Сначала проверяем, есть ли файл в известных парах
+        if (manualPairs[fileName]) {
+          return manualPairs[fileName];
+        }
+        
         const prompt = promptByFile[fileName];
         if (!prompt) {
           console.log(`No prompt found for file: ${fileName}`);
@@ -184,7 +256,7 @@ export function DataExport() {
       console.log('Using pre-loaded model dictionary for export:', Object.keys(modelDictionary).length);
       console.log('Loaded prompt data for files:', Object.keys(promptByFile).length);
       
-      const headers = [
+      const exportHeaders = [
         'participantId',
         'participantNickname',
         'imageFileName',
@@ -201,7 +273,7 @@ export function DataExport() {
         'timestamp'
       ].join(',');
 
-      const rows = querySnapshot.docs
+      const exportRows = querySnapshot.docs
         .map(doc => {
           const data = doc.data() as TrialDataFromFirestore;
           const aestheticInfo = aestheticWordMap[data.word] || { factor: '', connotation: '' };
@@ -240,7 +312,7 @@ export function DataExport() {
       console.log(`Analysis complete: ${filesWithoutPairs.size} files without pairs out of ${Object.keys(promptByFile).length} total files`);
       console.log('Examples of files without pairs:', Array.from(filesWithoutPairs).slice(0, 10));
 
-      const csv = [headers, ...rows].join('\n');
+      const csv = [exportHeaders, ...exportRows].join('\n');
       const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
