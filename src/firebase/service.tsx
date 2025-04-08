@@ -1015,4 +1015,73 @@ export const updateGlobalImageStats = async (imageFileNames: string[]): Promise<
     console.error('Error updating global image stats:', error);
     throw error;
   }
+};
+
+// Функция для сброса и коррекции количества раундов в лидерборде
+export const resetLeaderboardRounds = async () => {
+  console.log('[Reset Rounds] Starting reset of leaderboard rounds...');
+  try {
+    const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
+    console.log(`[Reset Rounds] Found ${leaderboardSnapshot.size} entries in leaderboard.`);
+
+    let updatedCount = 0;
+    const batch = writeBatch(db);
+    
+    for (const doc of leaderboardSnapshot.docs) {
+      // Пропускаем диагностические/отладочные записи
+      if (doc.id === '_debug_entry_' || doc.id.startsWith('debug-')) {
+        console.log(`[Reset Rounds] Skipping diagnostic entry: ${doc.id}`);
+        continue;
+      }
+
+      const data = doc.data();
+      const participantId = data.participantId;
+      
+      // Если нет participantId, пропускаем
+      if (!participantId) {
+        console.warn(`[Reset Rounds] Skipping entry without participantId: ${doc.id}`);
+        continue;
+      }
+
+      // Получаем сессии для точного подсчета раундов
+      const sessionsQuery = query(
+        collection(db, 'sessions'),
+        where('participantId', '==', participantId)
+      );
+      const sessionsSnapshot = await getDocs(sessionsQuery);
+      const sessionCount = sessionsSnapshot.size;
+      
+      // Правильное количество раундов = количество сессий
+      // Если у пользователя нет сессий, ставим 1 раунд
+      const correctRounds = Math.max(1, sessionCount);
+      
+      console.log(`[Reset Rounds] User ${doc.id}: Sessions=${sessionCount}, Old rounds=${data.roundsCompleted || 0}, New rounds=${correctRounds}`);
+      
+      // Если количество раундов отличается, обновляем
+      if (data.roundsCompleted !== correctRounds) {
+        // Обновляем основное поле roundsCompleted
+        batch.update(doc.ref, { roundsCompleted: correctRounds });
+        
+        // Если есть ratingDetails, обновляем и там
+        if (data.ratingDetails) {
+          batch.update(doc.ref, { 'ratingDetails.roundsCompleted': correctRounds });
+        }
+        
+        updatedCount++;
+      }
+    }
+    
+    // Применяем все обновления одним батчем
+    if (updatedCount > 0) {
+      await batch.commit();
+      console.log(`[Reset Rounds] Successfully updated ${updatedCount} entries.`);
+    } else {
+      console.log('[Reset Rounds] No entries needed updating.');
+    }
+    
+    return { success: true, updatedCount };
+  } catch (error) {
+    console.error('[Reset Rounds] Error resetting leaderboard rounds:', error);
+    return { success: false, error };
+  }
 }; 
