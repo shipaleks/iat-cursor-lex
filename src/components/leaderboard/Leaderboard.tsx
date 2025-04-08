@@ -235,7 +235,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
                   {entry.nickname === currentUserNickname ? entry.nickname : maskNickname(entry.nickname)}
                 </TableCell>
                 <TableCell>
-                  {entry.roundsCompleted || 0}
+                  {entry.roundsCompleted ? entry.roundsCompleted : (entry.nickname === 'Пока нет данных' ? '-' : '1')}
                 </TableCell>
                 <TableCell>
                   {entry.ratingDetails?.accuracy !== undefined ? entry.ratingDetails.accuracy.toFixed(1) : '0.0'}%
