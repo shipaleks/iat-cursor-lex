@@ -342,24 +342,26 @@ export const updateLeaderboard = async (
     console.log(`[LB Update] Found ${sessionsData.length} sessions.`);
 
     // Исправленная логика вычисления completedRounds
-    let completedRounds = 1; // По умолчанию первый раунд
+    // Для ПЕРВОГО запуска ВСЕГДА устанавливаем completedRounds = 1
+    let completedRounds = 1;
     
-    if (sessionsData.length > 0) {
-      // Если у нас есть сессии, это означает что текущая сессия - следующая
-      // Для первой сохраненной сессии (когда sessionsData.length = 0): completedRounds = 1
-      // Для второй сессии (sessionsData.length = 1): completedRounds = 2
-      // Для третьей сессии (sessionsData.length = 2): completedRounds = 3
-      completedRounds = sessionsData.length + 1;
+    // Для последующих запусков получаем значение из прогресса (наиболее надежный источник)
+    if (existingProgress && existingProgress.totalSessions > 0) {
+      completedRounds = existingProgress.totalSessions;
+      console.log(`[LB Update] Using rounds from progress: ${completedRounds}`);
+    } 
+    // В качестве запасного варианта, если в прогрессе нет данных, используем количество сессий
+    else if (sessionsData.length > 0) {
+      // Для второй и последующих сессий
+      // Важно: НЕ добавляем +1, так как текущая сессия уже должна быть в sessionsData
+      completedRounds = sessionsData.length;
+      console.log(`[LB Update] Using rounds from sessions count: ${completedRounds}`);
     }
     
-    // Для диагностики сравниваем с значением из прогресса пользователя
-    console.log(`[LB Update] Calculated rounds: ${completedRounds} (из прогресса: ${currentRounds}, из сессий: ${sessionsData.length})`);
+    // Проверка на минимальное значение (хотя бы первый раунд)
+    completedRounds = Math.max(1, completedRounds);
     
-    // Проверка: если из прогресса приходит большее значение, используем его
-    if (currentRounds > completedRounds) {
-      console.log(`[LB Update] WARNING: Progress rounds (${currentRounds}) > calculated (${completedRounds}), using progress value`);
-      completedRounds = currentRounds;
-    }
+    console.log(`[LB Update] Final completed rounds: ${completedRounds}`);
 
     // --- Лог №6: Перед проверкой существующей записи ЛБ ---
     console.log(`[LB Update] Checking existing LB entry for ID: ${safeNickname}`);
