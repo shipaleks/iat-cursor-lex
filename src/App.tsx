@@ -150,12 +150,15 @@ const App = () => {
     try {
       setLoading(true); 
       
-      // 1. Ищем прогресс по НИКНЕЙМУ
-      const existingProgress = await getParticipantProgressByNickname(nickname);
+      // Приводим никнейм к нижнему регистру для консистентности
+      const normalizedNickname = nickname.toLowerCase();
+      
+      // 1. Ищем прогресс по НИКНЕЙМУ (теперь ВСЕГДА в нижнем регистре)
+      const existingProgress = await getParticipantProgressByNickname(normalizedNickname);
       
       if (existingProgress && existingProgress.userId) {
         // 2. Если НАШЛИ прогресс по никнейму
-        console.log(`Found existing progress for nickname: ${nickname} with userId: ${existingProgress.userId}`);
+        console.log(`Found existing progress for nickname: ${normalizedNickname} with userId: ${existingProgress.userId}`);
         
         // Устанавливаем правильный userId для состояния participant
         const currentUserId = existingProgress.userId;
@@ -169,7 +172,7 @@ const App = () => {
         
         // Создаем объект участника с ПРАВИЛЬНЫМ userId
         const existingParticipant: Participant = {
-          nickname,
+          nickname, // Сохраняем оригинальный никнейм для отображения
           sessionId: crypto.randomUUID(),
           isTestSession,
           startTime: new Date(),
@@ -185,14 +188,15 @@ const App = () => {
           throw new Error('Current user not found during new participant creation');
         }
         const currentAuthUserId = auth.currentUser.uid;
-        console.log(`No existing progress for nickname ${nickname}. Creating new participant linked to auth user ${currentAuthUserId}`);
+        console.log(`No existing progress for nickname ${normalizedNickname}. Creating new participant linked to auth user ${currentAuthUserId}`);
         
         // Сбрасываем completedImages, так как это новый прогресс
         setCompletedImages([]); 
         
-        // Создаем связь никнейма с текущим auth userID
-        await setDoc(doc(db, 'nicknames', nickname), {
+        // Создаем связь никнейма с текущим auth userID (сохраняем в НИЖНЕМ регистре)
+        await setDoc(doc(db, 'nicknames', normalizedNickname), {
           userId: currentAuthUserId,
+          originalNickname: nickname, // Сохраняем оригинальный никнейм для отображения
           lastUpdated: serverTimestamp()
         });
         
@@ -209,7 +213,7 @@ const App = () => {
         
         // Создаем объект участника с ID текущего auth пользователя
         const newParticipant: Participant = {
-          nickname,
+          nickname, // Сохраняем оригинальный никнейм для отображения
           sessionId: crypto.randomUUID(),
           isTestSession,
           startTime: new Date(),

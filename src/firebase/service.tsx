@@ -64,52 +64,55 @@ export async function signInAnonymousUser() {
 // Используем ParticipantProgressType во внутреннем возвращаемом типе
 export const getParticipantProgressByNickname = async (nickname: string, forceNewProgress = false): Promise<{ userId: string; progress: ParticipantProgressType } | null> => {
   try {
-    console.log('Looking for progress by nickname:', nickname, 'forceNewProgress:', forceNewProgress);
+    // Убедимся, что никнейм в нижнем регистре
+    const normalizedNickname = nickname.toLowerCase();
+    
+    console.log('Looking for progress by nickname:', normalizedNickname, 'forceNewProgress:', forceNewProgress);
     
     // If we want to force new progress, skip nickname lookup
     if (!forceNewProgress) {
-      // Check for existing nickname
-    const nicknameDoc = await getDoc(doc(db, 'nicknames', nickname));
+      // Check for existing nickname (используем нормализованный никнейм)
+      const nicknameDoc = await getDoc(doc(db, 'nicknames', normalizedNickname));
     
-    if (nicknameDoc.exists()) {
+      if (nicknameDoc.exists()) {
         // Found existing nickname mapping
-      const userId = nicknameDoc.data().userId;
+        const userId = nicknameDoc.data().userId;
         console.log('Found existing user ID in nicknames:', userId);
       
         // Get progress by userId
-      const progressDoc = await getDoc(doc(db, 'progress', userId));
-      if (progressDoc.exists()) {
+        const progressDoc = await getDoc(doc(db, 'progress', userId));
+        if (progressDoc.exists()) {
           const progress = progressDoc.data() as ParticipantProgressType;
-          console.log('Loaded existing progress for nickname', nickname, 'with', progress.completedImages?.length || 0, 'completed images');
+          console.log('Loaded existing progress for nickname', normalizedNickname, 'with', progress.completedImages?.length || 0, 'completed images');
           
           // Проверим целостность данных
           if (!progress.completedImages) {
-            console.warn('Warning: completedImages missing in progress for nickname', nickname);
+            console.warn('Warning: completedImages missing in progress for nickname', normalizedNickname);
             progress.completedImages = [];
           } else if (!Array.isArray(progress.completedImages)) {
-            console.warn('Warning: completedImages is not an array for nickname', nickname, '- fixing it');
+            console.warn('Warning: completedImages is not an array for nickname', normalizedNickname, '- fixing it');
             progress.completedImages = [];
           }
           
           // Проверим и исправим userId, если отсутствует
           if (!progress.userId) {
-            console.warn('Warning: userId missing in progress for nickname', nickname, '- adding it');
+            console.warn('Warning: userId missing in progress for nickname', normalizedNickname, '- adding it');
             progress.userId = userId;
           }
           
-        return {
-          userId,
-          progress: {
-            ...progress,
+          return {
+            userId,
+            progress: {
+              ...progress,
               userId: progress.userId || userId,
-            completedImages: Array.isArray(progress.completedImages) ? progress.completedImages : []
-          }
-        };
-      } else {
+              completedImages: Array.isArray(progress.completedImages) ? progress.completedImages : []
+            }
+          };
+        } else {
           console.warn('Found nickname mapping but no progress document for userId', userId);
         }
       } else {
-        console.log('No nickname mapping found for', nickname);
+        console.log('No nickname mapping found for', normalizedNickname);
       }
     }
     
@@ -164,6 +167,9 @@ export const updateParticipantProgress = async (
   try {
     console.log(`[Progress Update] Updating progress for ${participantNickname} (${participantId}) after ${trialsData.length} trials.`);
     
+    // Нормализуем никнейм для консистентности
+    const normalizedNickname = participantNickname.toLowerCase();
+    
     // --- Извлекаем нужные данные из trialsData --- 
     const completedImagesInSession = [...new Set(trialsData.map(t => t.imageFileName))]; // Уникальные картинки
     const imagesSeenWithRealWordInSession = [
@@ -179,7 +185,7 @@ export const updateParticipantProgress = async (
     // ----------------------------------------------
 
     const progressRef = doc(db, 'progress', participantId);
-    const nicknameRef = doc(db, 'nicknames', participantNickname.toLowerCase());
+    const nicknameRef = doc(db, 'nicknames', normalizedNickname);
 
     // Используем транзакцию для атомарности
     await runTransaction(db, async (transaction) => {
@@ -215,9 +221,9 @@ export const updateParticipantProgress = async (
 
       // --- Подготовка данных для обновления --- 
       const updateData: Partial<ParticipantProgressType> = {
-      nickname: participantNickname,
+        nickname: participantNickname, // Сохраняем оригинальный никнейм для отображения
         userId: participantId,
-      completedImages: allCompletedImages,
+        completedImages: allCompletedImages,
         totalSessions: newTotalSessions,
         lastSessionTimestamp: serverTimestamp(),
         imagesSeenWithRealWord: allImagesSeenWithRealWord,
@@ -233,8 +239,12 @@ export const updateParticipantProgress = async (
         console.log('[Progress Update] Existing progress document updated.');
       }
 
-      // Обновляем или создаем запись в nicknames
-      transaction.set(nicknameRef, { userId: participantId }, { merge: true });
+      // Обновляем или создаем запись в nicknames (всегда используем нормализованный никнейм)
+      transaction.set(nicknameRef, { 
+        userId: participantId,
+        originalNickname: participantNickname, // Сохраняем оригинальный никнейм
+        lastUpdated: serverTimestamp()
+      }, { merge: true });
     });
 
     // Обновляем глобальную статистику изображений
@@ -317,9 +327,13 @@ export const updateLeaderboard = async (
   // --- Лог №1: Начало функции ---
   console.log(`[LB Update START] Nick: ${nickname}, PID: ${participantId}, Trials: ${correctTrials}/${totalTrials}, Time: ${totalTimeMs}, Device: ${deviceType}`);
 
-  const safeNickname = nickname.replace(/[^a-zA-Z0-9-_]/g, '_').toLowerCase();
-  if (safeNickname !== nickname) {
-    console.log(`[LB Update] Normalized nickname to safe ID '${safeNickname}'`);
+  // Нормализуем никнейм для консистентного хранения
+  const normalizedNickname = nickname.toLowerCase();
+  
+  // Дополнительно преобразуем в безопасный ID для Firestore
+  const safeNickname = normalizedNickname.replace(/[^a-zA-Z0-9-_]/g, '_');
+  if (safeNickname !== normalizedNickname) {
+    console.log(`[LB Update] Normalized nickname for safe ID: '${normalizedNickname}' -> '${safeNickname}'`);
   }
 
   try {
@@ -380,7 +394,8 @@ export const updateLeaderboard = async (
 
       const leaderboardRef = doc(db, 'leaderboard', safeNickname);
       const leaderboardEntry = {
-      nickname,
+        nickname, // Сохраняем оригинальный никнейм для отображения
+        normalizedNickname, // Сохраняем нормализованный никнейм для поиска
         participantId,
         score: currentSessionRating.finalScore,
         accuracy: currentSessionRating.accuracy,
@@ -456,6 +471,7 @@ export const updateLeaderboard = async (
     const leaderboardRef = doc(db, 'leaderboard', safeNickname);
     const leaderboardData = {
       nickname, // Сохраняем оригинальный никнейм для отображения
+      normalizedNickname, // Сохраняем нормализованный никнейм для поиска
       participantId,
       accuracy: averageRating.accuracy, // Средняя точность (в %)
       totalTimeMs: averageTimeMs, // Среднее время на сессию
