@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, IconButton } from '@mui/material';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config.tsx';
@@ -6,6 +6,8 @@ import { AESTHETIC_WORDS } from '../../utils/wordBank';
 import DownloadIcon from '@mui/icons-material/Download';
 import { WordType } from '../../types';
 import { loadModelDictionary } from '../../utils/trialGenerator';
+import { aestheticWordMap } from '../../data/aestheticWords';
+import manualPairsData from '../../data/manualPairs.json';
 
 const PIN = '1921';
 
@@ -19,11 +21,6 @@ interface TrialDataFromFirestore {
   reactionTimeMs: number;
   timestamp: any;
 }
-
-const aestheticWordMap = AESTHETIC_WORDS.reduce((acc, aw) => {
-  acc[aw.word] = { factor: aw.factor, connotation: aw.connotation };
-  return acc;
-}, {} as { [key: string]: { factor: number; connotation: string } });
 
 export function DataExport() {
   const [open, setOpen] = useState(false);
@@ -189,11 +186,7 @@ export function DataExport() {
       
       // Список проблемных файлов (без пар)
       const filesWithoutPairs = new Set<string>();
-      const manualPairs: { [key: string]: string } = {
-        '54.png': '495.png',
-        '495.png': '54.png',
-        // Добавьте другие известные пары здесь при необходимости
-      };
+      const manualPairs: { [key: string]: string } = manualPairsData;
       
       // Функция для поиска ассоциированного файла
       const findAssociatedFile = (fileName: string): string => {
