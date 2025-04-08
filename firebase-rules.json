@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "leaderboard": {
+      ".read": true,
+      ".write": "auth.uid != null"
+    },
+    "trials": {
+      ".read": true,
+      ".write": "auth.uid != null"
+    },
+    "sessions": {
+      ".read": true,
+      ".write": "auth.uid != null"
+    },
+    "progress": {
+      ".read": true,
+      ".write": "auth.uid != null"
+    },
+    "nicknames": {
+      ".read": true,
+      ".write": "auth.uid != null"
+    },
+    "stats": {
+      ".read": true,
+      ".write": "auth.uid != null"
+    }
+  }
+} 

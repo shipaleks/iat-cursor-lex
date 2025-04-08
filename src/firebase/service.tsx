@@ -237,6 +237,9 @@ export const updateParticipantProgress = async (
       transaction.set(nicknameRef, { userId: participantId }, { merge: true });
     });
 
+    // Обновляем глобальную статистику изображений
+    await updateGlobalImageStats(completedImagesInSession);
+
     console.log(`[Progress Update] Progress update successful for ${participantNickname}.`);
   } catch (error) {
     console.error('[Progress Update] Error updating participant progress:', error);
@@ -719,5 +722,62 @@ export const getPreviousTrials = async (participantId: string) => {
   } catch (error) {
     console.error('Error getting previous trials:', error);
     return []; // В случае ошибки возвращаем пустой массив
+  }
+};
+
+// Функция для получения глобальной статистики использования изображений
+export const getGlobalImageStats = async (): Promise<{ [imageFileName: string]: number }> => {
+  try {
+    const statsDoc = await getDoc(doc(db, 'stats', 'imageStats'));
+    if (!statsDoc.exists()) {
+      console.log('Global image stats not found, creating empty stats');
+      return {};
+    }
+    
+    const data = statsDoc.data();
+    return data.imageCounts || {};
+  } catch (error) {
+    console.error('Error getting global image stats:', error);
+    return {};
+  }
+};
+
+// Функция для обновления глобальной статистики использования изображений
+export const updateGlobalImageStats = async (imageFileNames: string[]): Promise<void> => {
+  try {
+    const statsRef = doc(db, 'stats', 'imageStats');
+    
+    // Используем транзакцию для атомарного обновления
+    await runTransaction(db, async (transaction) => {
+      const statsDoc = await transaction.get(statsRef);
+      
+      // Получаем текущие счетчики или создаем новые
+      const currentCounts = statsDoc.exists() ? statsDoc.data().imageCounts || {} : {};
+      const updatedCounts = { ...currentCounts };
+      
+      // Обновляем счетчики для каждого изображения
+      imageFileNames.forEach(fileName => {
+        updatedCounts[fileName] = (updatedCounts[fileName] || 0) + 1;
+      });
+      
+      // Сохраняем обновленные счетчики
+      if (statsDoc.exists()) {
+        transaction.update(statsRef, { 
+          imageCounts: updatedCounts,
+          lastUpdated: serverTimestamp()
+        });
+      } else {
+        transaction.set(statsRef, { 
+          imageCounts: updatedCounts,
+          lastUpdated: serverTimestamp(),
+          createdAt: serverTimestamp()
+        });
+      }
+    });
+    
+    console.log(`Global image stats updated for ${imageFileNames.length} images`);
+  } catch (error) {
+    console.error('Error updating global image stats:', error);
+    throw error;
   }
 }; 

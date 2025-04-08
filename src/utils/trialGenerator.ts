@@ -5,6 +5,7 @@ import { AESTHETIC_WORDS } from './wordBank';
 // Добавляем импорты Firestore
 import { getDocs, collection } from 'firebase/firestore';
 import { db } from '../firebase/config'; // Убедимся, что путь правильный
+import { getGlobalImageStats } from '../firebase/service'; // Импортируем функцию получения глобальной статистики
 
 // ВАЖНО: Этот список нужно будет наполнить вручную!
 // Список наречий, похожих на целевые, но не входящих в них.
@@ -2044,7 +2045,7 @@ export async function createSession(
   v10SeenCount: number = 0
 ): Promise<Session> {
   
-    await loadImages();
+  await loadImages();
   await loadWordStats(); // Предзагружаем статистику слов
   if (IMAGES.length === 0) {
       throw new Error("Image data is not available after attempting to load.");
@@ -2054,6 +2055,10 @@ export async function createSession(
   console.log("Previously completed images (any word):", completedImageFileNames.length);
   console.log("Images seen with a REAL word:", imagesSeenWithRealWordNames.length);
   console.log("Previous trials count:", previousTrials.length);
+
+  // Загружаем глобальную статистику изображений
+  const globalImageStats = await getGlobalImageStats();
+  console.log("Loaded global image stats for", Object.keys(globalImageStats).length, "images");
 
   const usedImageWordPairs = new Set<string>();
   previousTrials.forEach(trial => {
@@ -2072,67 +2077,93 @@ export async function createSession(
 
   console.log(`Image groups: Unseen=${unseenImages.length}, SeenWithoutReal=${seenButNotWithReal.length}, SeenWithReal=${seenWithReal.length}`);
 
+  // Функция для получения глобального количества показов изображения
+  const getGlobalImageShowCount = (fileName: string): number => globalImageStats[fileName] || 0;
+
   let selectedImagesForSession: ImageData[] = [];
   
   // 2. Приоритет 1: Абсолютно новые (unseenImages)
-  // --- Начало Шага 4 --- 
-  // Стараемся сбалансировать модели уже на этом этапе
   if (unseenImages.length > 0) {
-    const modelDict = modelDictionaryCache || {};
+    // Сортируем по глобальному счетчику показов (сначала наименее показанные)
     unseenImages.sort((a, b) => {
+      // Сначала сортируем по глобальному количеству показов
+      const globalCountA = getGlobalImageShowCount(a.fileName);
+      const globalCountB = getGlobalImageShowCount(b.fileName);
+      if (globalCountA !== globalCountB) {
+        return globalCountA - globalCountB; // Сначала изображения с меньшим количеством показов
+      }
+
+      // Если глобальные счетчики равны, учитываем модель
+      const modelDict = modelDictionaryCache || {};
       const modelA = modelDict[a.fileName];
       const modelB = modelDict[b.fileName];
+      
       // Отдаем приоритет модели, которую видели реже
       if (modelA === 'v8_latent_finetune' && modelB !== 'v8_latent_finetune') {
         return v8SeenCount - v10SeenCount; // Если v8 видели реже, он будет раньше
       } else if (modelA !== 'v8_latent_finetune' && modelB === 'v8_latent_finetune') {
         return v10SeenCount - v8SeenCount; // Если v10 видели реже, он будет раньше
       }
-      return Math.random() - 0.5; // Если модели одинаковые или неизвестные, перемешиваем случайно
+      
+      return Math.random() - 0.5; // Если все счетчики равны, перемешиваем случайно
     });
     
     const numToTake = Math.min(unseenImages.length, NUM_IMAGES_PER_SESSION);
     selectedImagesForSession.push(...unseenImages.slice(0, numToTake));
-    console.log(`Selected ${selectedImagesForSession.length} from UNSEEN group (model balanced).`);
+    console.log(`Selected ${selectedImagesForSession.length} from UNSEEN group (globally balanced).`);
   }
-  // --- Конец Шага 4 --- 
 
   // 3. Приоритет 2: Виденные, но НЕ с реальным словом (seenButNotWithReal)
   if (selectedImagesForSession.length < NUM_IMAGES_PER_SESSION && seenButNotWithReal.length > 0) {
     const numNeeded = NUM_IMAGES_PER_SESSION - selectedImagesForSession.length;
-    // --- Начало Шага 4 --- 
-    // Тоже балансируем по моделям
-    const modelDict = modelDictionaryCache || {};
-    seenButNotWithReal.sort((a, b) => { /* ... та же логика сортировки по v8SeenCount/v10SeenCount ... */
+    
+    // Сортируем по тем же критериям, что и unseenImages
+    seenButNotWithReal.sort((a, b) => {
+      // Сначала сортируем по глобальному количеству показов
+      const globalCountA = getGlobalImageShowCount(a.fileName);
+      const globalCountB = getGlobalImageShowCount(b.fileName);
+      if (globalCountA !== globalCountB) {
+        return globalCountA - globalCountB;
+      }
+
+      // Затем учитываем модель
+      const modelDict = modelDictionaryCache || {};
       const modelA = modelDict[a.fileName];
       const modelB = modelDict[b.fileName];
       if (modelA === 'v8_latent_finetune' && modelB !== 'v8_latent_finetune') return v8SeenCount - v10SeenCount;
       if (modelA !== 'v8_latent_finetune' && modelB === 'v8_latent_finetune') return v10SeenCount - v8SeenCount;
       return Math.random() - 0.5;
     });
-    // --- Конец Шага 4 --- 
+    
     const numToTake = Math.min(seenButNotWithReal.length, numNeeded);
     selectedImagesForSession.push(...seenButNotWithReal.slice(0, numToTake));
-    console.log(`Selected ${numToTake} from SEEN_WITHOUT_REAL group (model balanced).`);
+    console.log(`Selected ${numToTake} from SEEN_WITHOUT_REAL group (globally balanced).`);
   }
 
   // 4. Приоритет 3: Уже виденные с реальным словом (seenWithReal)
   if (selectedImagesForSession.length < NUM_IMAGES_PER_SESSION && seenWithReal.length > 0) {
     const numNeeded = NUM_IMAGES_PER_SESSION - selectedImagesForSession.length;
-    // --- Начало Шага 4 --- 
-    // Сначала сортируем по РЕДКОСТИ МОДЕЛИ, потом по РАЗНООБРАЗИЮ СЛОВ
-    const modelDict = modelDictionaryCache || {};
-    const imageRealWordCount = new Map<string, number>(); // Расчет без изменений
+    
+    // Учитываем разнообразие слов для картинок с реальными словами
+    const imageRealWordCount = new Map<string, number>();
     seenWithReal.forEach(img => {
-        const count = new Set(previousTrials
-          .filter(trial => trial.imageFileName === img.fileName && trial.wordType === 'aesthetic')
-          .map(t => t.word)
-        ).size;
-        imageRealWordCount.set(img.fileName, count);
+      const count = new Set(previousTrials
+        .filter(trial => trial.imageFileName === img.fileName && trial.wordType === 'aesthetic')
+        .map(t => t.word)
+      ).size;
+      imageRealWordCount.set(img.fileName, count);
     });
     
     seenWithReal.sort((a, b) => {
-      // Приоритет 1: Модель, которую видели реже
+      // Приоритет 1: Глобальное количество показов
+      const globalCountA = getGlobalImageShowCount(a.fileName);
+      const globalCountB = getGlobalImageShowCount(b.fileName);
+      if (globalCountA !== globalCountB) {
+        return globalCountA - globalCountB;
+      }
+      
+      // Приоритет 2: Модель, которую видели реже
+      const modelDict = modelDictionaryCache || {};
       const modelA = modelDict[a.fileName];
       const modelB = modelDict[b.fileName];
       let modelCompare = 0;
@@ -2141,14 +2172,13 @@ export async function createSession(
       
       if (modelCompare !== 0) return modelCompare;
       
-      // Приоритет 2 (если модели равны): Картинка с меньшим разнообразием реальных слов
+      // Приоритет 3: Картинка с меньшим разнообразием реальных слов
       return (imageRealWordCount.get(a.fileName) || 0) - (imageRealWordCount.get(b.fileName) || 0);
     });
-    // --- Конец Шага 4 --- 
     
     const numToTake = Math.min(seenWithReal.length, numNeeded);
     selectedImagesForSession.push(...seenWithReal.slice(0, numToTake));
-    console.log(`Selected ${numToTake} from SEEN_WITH_REAL group (model/word balanced).`);
+    console.log(`Selected ${numToTake} from SEEN_WITH_REAL group (globally balanced).`);
   }
   // --- Конец измененной логики выбора картинок ---
 
@@ -2162,7 +2192,7 @@ export async function createSession(
   // Предварительная загрузка ТОЛЬКО выбранных изображений
   const imageUrls = selectedImagesForSession.map(img => img.url);
   try {
-    await preloadImages(imageUrls);
+  await preloadImages(imageUrls);
     console.log('Selected images preloaded for current session.');
   } catch (error) {
     console.error('Error preloading session images:', error);
