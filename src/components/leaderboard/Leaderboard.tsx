@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { getLeaderboard, resetLeaderboardRounds } from '../../firebase/service.tsx';
+import { getLeaderboard } from '../../firebase/service.tsx';
 import { LeaderboardEntry as LeaderboardEntryType } from '../../types';
 
 // Функция маскировки никнейма
@@ -42,7 +42,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [loadAttempts, setLoadAttempts] = useState(0); // Счетчик попыток загрузки
-  const [isFixingRounds, setIsFixingRounds] = useState(false); // Состояние для кнопки фикса раундов
 
   // Автоматическое обновление каждые 5 секунд
   useEffect(() => {
@@ -52,23 +51,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
     
     return () => clearInterval(interval);
   }, []);
-
-  // Функция для исправления количества раундов
-  const handleFixRounds = async () => {
-    if (isFixingRounds) return;
-    try {
-      setIsFixingRounds(true);
-      console.log('Запускаем исправление раундов в лидерборде...');
-      const result = await resetLeaderboardRounds();
-      console.log('Результат исправления:', result);
-      // Обновляем данные после исправления
-      setLastUpdate(Date.now());
-    } catch (error) {
-      console.error('Ошибка при исправлении раундов:', error);
-    } finally {
-      setIsFixingRounds(false);
-    }
-  };
 
   useEffect(() => {
     const loadLeaderboard = async () => {
@@ -214,20 +196,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
           </Typography>
         </Box>
       )}
-
-      {/* Временная кнопка для исправления раундов */}
-      <Box display="flex" justifyContent="center" mb={2}>
-        <Button
-          variant="contained"
-          color="warning"
-          size="small"
-          disabled={isFixingRounds}
-          onClick={handleFixRounds}
-          sx={{ fontSize: '0.75rem' }}
-        >
-          {isFixingRounds ? 'Исправляем...' : 'Исправить раунды'}
-        </Button>
-      </Box>
 
       {currentUser && !isCurrentUserInTop5 && !showAll && (
         <Box sx={{ mb: 2, p: 2, bgcolor: 'primary.main', borderRadius: 1 }}>
