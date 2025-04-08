@@ -29,12 +29,28 @@ interface CompletionScreenProps {
 export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant, sessionStats, onNextRound, completedImages }) => {
   const navigate = useNavigate();
   const [rating, setRating] = useState<RatingCalculation | null>(null);
+  const [refreshTime, setRefreshTime] = useState(Date.now()); // Для принудительного обновления
+
+  // Функция для обновления данных рейтинга
+  const refreshRating = () => {
+    console.log('[CompletionScreen] Refreshing rating data');
+    setRefreshTime(Date.now());
+  };
+
+  // Периодическое обновление данных
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshRating();
+    }, 2000); // Обновляем каждые 2 секунды
+    
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const calculateAndShowRating = async () => {
       try {
-        console.log('Статистика сессии:', sessionStats);
-        console.log('Массив завершенных изображений (детали):', {
+        console.log('[CompletionScreen] Calculating rating, stats:', sessionStats);
+        console.log('[CompletionScreen] Completed images:', {
           имеется: completedImages !== undefined,
           длина: completedImages?.length || 0,
           примерСодержимого: completedImages?.slice(0, 3)
@@ -48,14 +64,14 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
             const progress = await getParticipantProgress(participant.userId);
             if (progress && progress.totalSessions) {
               roundsCompleted = Math.max(1, progress.totalSessions);
-              console.log(`🔢 РАСЧЕТ РАУНДОВ НА ФИНАЛЬНОМ ЭКРАНЕ:`);
+              console.log(`[CompletionScreen] РАСЧЕТ РАУНДОВ НА ФИНАЛЬНОМ ЭКРАНЕ:`);
               console.log(`  - ID пользователя: ${participant.userId}`);
               console.log(`  - Никнейм: ${participant.nickname}`);
               console.log(`  - Количество сессий в БД: ${progress.totalSessions}`);
               console.log(`  - Итоговый номер раунда: ${roundsCompleted}`);
             }
           } catch (error) {
-            console.error('Ошибка при получении прогресса:', error);
+            console.error('[CompletionScreen] Ошибка при получении прогресса:', error);
           }
         }
         
@@ -65,15 +81,15 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
           sessionStats.totalTimeMs,
           roundsCompleted
         );
-        console.log('Полученный рейтинг от сервера:', JSON.stringify(rating, null, 2));
+        console.log('[CompletionScreen] Полученный рейтинг от сервера:', JSON.stringify(rating, null, 2));
         setRating(rating);
       } catch (error) {
-        console.error('Ошибка при расчете рейтинга:', error);
+        console.error('[CompletionScreen] Ошибка при расчете рейтинга:', error);
       }
     };
 
     calculateAndShowRating();
-  }, [sessionStats, completedImages, participant]);
+  }, [sessionStats, completedImages, participant, refreshTime]); // Добавляем refreshTime зависимость
 
   if (!rating) return null;
   console.log('Отображение с рейтингом:', rating);

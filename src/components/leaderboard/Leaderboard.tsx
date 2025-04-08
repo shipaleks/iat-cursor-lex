@@ -39,10 +39,22 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
   const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState(Date.now());
+
+  // Автоматическое обновление каждые 5 секунд
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLastUpdate(Date.now());
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const loadLeaderboard = async () => {
+      setLoading(true);
       try {
+        console.log('[Leaderboard] Loading leaderboard data...');
         const data = await getLeaderboard();
         
         // Сортируем по убыванию рейтинга и добавляем ранг
@@ -53,6 +65,21 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
             rank: index + 1
           }));
         setLeaderboard(sortedData);
+        console.log('[Leaderboard] Loaded', sortedData.length, 'entries');
+        
+        if (currentUserNickname) {
+          const currentUser = sortedData.find(entry => entry.nickname === currentUserNickname);
+          if (currentUser) {
+            console.log('[Leaderboard] Current user data:', { 
+              nickname: currentUser.nickname,
+              rank: currentUser.rank,
+              score: currentUser.score,
+              rounds: currentUser.roundsCompleted || 0
+            });
+          } else {
+            console.log('[Leaderboard] Current user not found in leaderboard');
+          }
+        }
       } catch (err) {
         setError('Не удалось загрузить таблицу лидеров');
         console.error('Error loading leaderboard:', err);
@@ -62,7 +89,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
     };
 
     loadLeaderboard();
-  }, []);
+  }, [currentUserNickname, lastUpdate]); // Перезагружаем при изменении никнейма или lastUpdate
 
   if (loading) {
     return (

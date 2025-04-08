@@ -316,7 +316,12 @@ export const updateLeaderboard = async (
 ): Promise<RatingCalculation> => {
   console.log(`[Leaderboard Update] Starting for ${nickname} (${participantId})`);
   try {
-    // 1. Получаем ВСЕ сессии пользователя, чтобы посчитать средние значения
+    // 1. Сначала получаем текущий прогресс для точного подсчета раундов
+    const existingProgress = await getParticipantProgress(participantId);
+    const currentRounds = Math.max(1, existingProgress?.totalSessions || 0);
+    console.log(`[Leaderboard Update] Current rounds from progress: ${currentRounds}`);
+
+    // 2. Получаем ВСЕ сессии пользователя, чтобы посчитать средние значения
     const sessionsQuery = query(
       collection(db, 'sessions'),
       where('participantId', '==', participantId) // Используем ID для надежности
@@ -325,10 +330,17 @@ export const updateLeaderboard = async (
     const sessionsData = sessionsSnapshot.docs.map(doc => doc.data());
     console.log(`[Leaderboard Update] Found ${sessionsData.length} previous sessions.`);
 
+    // 3. Определяем корректное количество раундов (берем максимальное из всех источников)
+    let completedRounds = Math.max(
+      currentRounds,
+      sessionsData.length + 1
+    );
+    console.log(`[Leaderboard Update] Final rounds calculation: max(${currentRounds}, ${sessionsData.length + 1}) = ${completedRounds}`);
+
     if (sessionsData.length === 0) {
       console.warn(`[Leaderboard Update] No sessions found for ${nickname}, calculating for current session only.`);
       // Вычисляем рейтинг для текущей сессии и записываем в лидерборд
-      const currentSessionRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, 1);
+      const currentSessionRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, completedRounds);
       console.log(`[Leaderboard Update] Rating for current session only:`, currentSessionRating);
       
       // Важно! Создаем запись в лидерборде даже если это первый раунд
@@ -339,19 +351,19 @@ export const updateLeaderboard = async (
         score: currentSessionRating.finalScore, 
         accuracy: currentSessionRating.accuracy,
         totalTimeMs: totalTimeMs, 
-        roundsCompleted: 1, 
+        roundsCompleted: completedRounds, // Используем точное количество раундов
         deviceType: deviceType, 
         ratingDetails: currentSessionRating, 
         lastUpdated: serverTimestamp(),
         totalTrials: totalTrials,
         correctTrials: correctTrials
       });
-      console.log(`[Leaderboard Update] Created initial leaderboard entry for ${nickname}`);
+      console.log(`[Leaderboard Update] Created initial leaderboard entry for ${nickname} with ${completedRounds} rounds`);
        
       return currentSessionRating; 
     }
 
-    // 2. Считаем СУММАРНЫЕ и СРЕДНИЕ значения по ВСЕМ сессиям
+    // 4. Считаем СУММАРНЫЕ и СРЕДНИЕ значения по ВСЕМ сессиям
     const totalSessions = sessionsData.length;
     const totalCorrectTrialsAllSessions = sessionsData.reduce((sum, session) => sum + (session.correctTrials || 0), 0);
     const totalTrialsAllSessions = sessionsData.reduce((sum, session) => sum + (session.totalTrials || 0), 0);
@@ -359,19 +371,7 @@ export const updateLeaderboard = async (
     const averageTimeMs = totalTimeMsAllSessions / totalSessions;
     console.log(`[Leaderboard Update] Totals across ${totalSessions} sessions: Trials=${totalTrialsAllSessions}, Correct=${totalCorrectTrialsAllSessions}, Time=${totalTimeMsAllSessions}ms, AvgTime=${averageTimeMs.toFixed(0)}ms`);
 
-    // 3. Получаем ПРОГРЕСС участника для определения количества раундов
-    const existingProgress = await getParticipantProgress(participantId);
-    let completedRounds = Math.max(1, existingProgress?.totalSessions || 0);
-    
-    // Проверяем, что completedRounds соответствует количеству сессий
-    if (completedRounds < sessionsData.length + 1) {
-      completedRounds = sessionsData.length + 1;
-      console.warn(`[Leaderboard Update] Detected inconsistency - totalSessions (${existingProgress?.totalSessions}) is less than actual sessions count (${sessionsData.length + 1}). Using the higher value: ${completedRounds}`);
-    }
-    
-    console.log(`[Leaderboard Update] Rounds completed from progress: ${completedRounds}`);
-    
-    // --- Получаем детальную статистику по словам для calculateRating --- 
+    // 5. Получаем детальную статистику по словам для calculateRating
     let realWordTrials = 0;
     let correctRealWordTrials = 0;
     let nonWordTrials = 0;
@@ -382,10 +382,9 @@ export const updateLeaderboard = async (
       nonWordTrials += session.nonWordTrials || 0;
       correctNonWordTrials += session.correctNonWordTrials || 0;
     });
-     console.log(`[Leaderboard Update] Word type stats: Real=${correctRealWordTrials}/${realWordTrials}, NonWord=${correctNonWordTrials}/${nonWordTrials}`);
-    // -----------------------------------------------------------------
+    console.log(`[Leaderboard Update] Word type stats: Real=${correctRealWordTrials}/${realWordTrials}, NonWord=${correctNonWordTrials}/${nonWordTrials}`);
 
-    // 4. Рассчитываем СРЕДНИЙ рейтинг по ВСЕМ сессиям
+    // 6. Рассчитываем СРЕДНИЙ рейтинг по ВСЕМ сессиям
     console.log(`[Leaderboard Update] Calculating AVERAGE rating with: totalTrials=${totalTrialsAllSessions}, correctTrials=${totalCorrectTrialsAllSessions}, avgTimeMs=${averageTimeMs}, rounds=${completedRounds}`);
     const averageRating = await calculateRating(
       totalTrialsAllSessions,
@@ -399,11 +398,11 @@ export const updateLeaderboard = async (
     );
     console.log(`[Leaderboard Update] Calculated AVERAGE rating:`, averageRating);
 
-    // 5. Определяем последний тип устройства
+    // 7. Определяем последний тип устройства
     const latestDeviceType = deviceType;
     console.log(`[Leaderboard Update] Using device type: ${latestDeviceType}`);
 
-    // 6. Обновляем запись в таблице лидеров СРЕДНИМ рейтингом
+    // 8. Обновляем запись в таблице лидеров СРЕДНИМ рейтингом
     const leaderboardRef = doc(db, 'leaderboard', nickname);
     const leaderboardData = {
       nickname,
@@ -411,7 +410,7 @@ export const updateLeaderboard = async (
       accuracy: averageRating.accuracy, // Средняя точность (в %)
       totalTimeMs: averageTimeMs, // Среднее время на сессию
       score: averageRating.finalScore, // Средний итоговый балл
-      roundsCompleted: completedRounds, 
+      roundsCompleted: completedRounds, // Используем точное количество раундов
       deviceType: latestDeviceType,
       ratingDetails: averageRating, // Сохраняем весь объект среднего рейтинга
       lastUpdated: serverTimestamp(),
@@ -427,9 +426,9 @@ export const updateLeaderboard = async (
     };
     console.log('[Leaderboard Update] Data to save:', leaderboardData);
     await setDoc(leaderboardRef, leaderboardData, { merge: true });
-    console.log(`[Leaderboard Update] Leaderboard document for ${nickname} updated successfully.`);
+    console.log(`[Leaderboard Update] Leaderboard document for ${nickname} updated successfully with ${completedRounds} rounds`);
 
-    // Возвращаем РЕЙТИНГ ТЕКУЩЕЙ СЕССИИ (для отображения на CompletionScreen)
+    // 9. Возвращаем РЕЙТИНГ ТЕКУЩЕЙ СЕССИИ (для отображения на CompletionScreen)
     console.log(`[Leaderboard Update] Calculating rating for CURRENT session: trials=${totalTrials}, correct=${correctTrials}, time=${totalTimeMs}, rounds=${completedRounds}`);
     const currentSessionRating = await calculateRating(
         totalTrials, correctTrials, totalTimeMs, completedRounds
@@ -623,7 +622,7 @@ export const calculateRating = async (
   nonWordTrials: number = 0,
   correctNonWordTrials: number = 0
 ): Promise<RatingCalculation> => {
-  console.log('Входные данные calculateRating:', { 
+  console.log('[Rating] Входные данные calculateRating:', { 
     totalTrials, 
     correctTrials, 
     totalTimeMs, 
@@ -635,7 +634,7 @@ export const calculateRating = async (
   });
 
   if (totalTrials <= 0) {
-    console.log('Нет испытаний, возвращаем нулевой рейтинг');
+    console.log('[Rating] Нет испытаний, возвращаем нулевой рейтинг');
     return {
       rating: 0, timeScore: 0, accuracyMultiplier: 0, accuracy: 0, actualTime: 0, 
       theoreticalMinTime: 0, roundsCompleted: 1, bonusPercentage: 100, 
@@ -672,18 +671,30 @@ export const calculateRating = async (
   // 3. Расчет базового рейтинга (до бонуса)
   const baseRatingScore = Math.round((accuracyMultiplier * 85) + timeScore);
 
-  // 4. Расчет бонуса
+  // 4. Расчет бонуса (исправлено)
+  // Гарантируем, что roundsCompleted >= 1
+  const actualRoundsCompleted = Math.max(1, roundsCompleted || 1);
+  
+  // Бонус: 0% за первый раунд, +5% за каждый следующий раунд
+  // Первый раунд (actualRoundsCompleted == 1) => additionalBonusPercent = 0
+  // Второй раунд (actualRoundsCompleted == 2) => additionalBonusPercent = 5
+  // и т.д.
+  const additionalBonusPercent = (actualRoundsCompleted - 1) * 5;
+  
+  // Ограничиваем максимальный бонус (до 25 раундов)
+  const cappedBonusPercent = Math.min(additionalBonusPercent, 25 * 5);
+  
+  // Базовый процент всегда 100%
   const baseBonusPercent = 100;
-  const additionalBonusPercent = Math.min(roundsCompleted * 5, 25 * 5);
-  const finalBonusPercentage = baseBonusPercent + additionalBonusPercent;
+  const finalBonusPercentage = baseBonusPercent + cappedBonusPercent;
   const finalRoundBonusMultiplier = finalBonusPercentage / 100;
 
   // 5. Расчет финального счета
   const finalScoreWithBonus = Math.round(baseRatingScore * finalRoundBonusMultiplier);
 
-  console.log(`Rating Calc: Accuracy=${(accuracy * 100).toFixed(1)}%, TimeScore=${timeScore}, BaseScore=${baseRatingScore}`);
-  console.log(`Bonus Calc: Rounds=${roundsCompleted}, Bonus%=${finalBonusPercentage}, Multiplier=${finalRoundBonusMultiplier.toFixed(2)}`);
-  console.log(`Final Score: ${finalScoreWithBonus}`);
+  console.log(`[Rating] Accuracy=${(accuracy * 100).toFixed(1)}%, TimeScore=${timeScore}, BaseScore=${baseRatingScore}`);
+  console.log(`[Rating] Rounds=${actualRoundsCompleted}, Bonus=${cappedBonusPercent}%, Total=${finalBonusPercentage}%, Multiplier=${finalRoundBonusMultiplier.toFixed(2)}`);
+  console.log(`[Rating] Final Score=${finalScoreWithBonus}`);
 
   // 6. Возвращаем все рассчитанные значения
   return {
@@ -693,7 +704,7 @@ export const calculateRating = async (
     accuracy: accuracy * 100, 
     actualTime: totalTimeMs, // Общее время сессии
     theoreticalMinTime: theoreticalMinTime, // Теоретическое общее время
-    roundsCompleted: roundsCompleted,
+    roundsCompleted: actualRoundsCompleted, // Используем гарантированное количество раундов
     bonusPercentage: finalBonusPercentage,
     roundBonus: finalRoundBonusMultiplier,
     finalScore: finalScoreWithBonus
