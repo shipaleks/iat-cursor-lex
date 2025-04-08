@@ -358,35 +358,38 @@ export const updateLeaderboard = async (
       const leaderboardRef = doc(db, 'leaderboard', safeNickname);
       const leaderboardEntry = {
         nickname, // Сохраняем оригинальный никнейм для отображения
-        participantId, 
-        score: currentSessionRating.finalScore, 
+        participantId,
+        score: currentSessionRating.finalScore,
         accuracy: currentSessionRating.accuracy,
-        totalTimeMs: totalTimeMs, 
+        totalTimeMs: totalTimeMs,
         roundsCompleted: completedRounds, // Используем точное количество раундов
-        deviceType: deviceType, 
-        ratingDetails: currentSessionRating, 
+        deviceType: deviceType,
+        ratingDetails: currentSessionRating,
         lastUpdated: serverTimestamp(),
         totalTrials: totalTrials,
         correctTrials: correctTrials
       };
-      
+      console.log(`[Leaderboard Update] Attempting to setDoc for initial entry: ${safeNickname}`, leaderboardEntry); // Лог перед записью
       try {
         // Используем setDoc вместо updateDoc для гарантированного создания или обновления
         await setDoc(leaderboardRef, leaderboardEntry);
-        console.log(`[Leaderboard Update] Created/updated initial leaderboard entry for ${safeNickname} with ${completedRounds} rounds`);
-        
+        console.log(`[Leaderboard Update] Successfully setDoc for initial entry: ${safeNickname}`);
+
         // Проверяем, что запись действительно создалась
         const verifyDoc = await getDoc(leaderboardRef);
         if (verifyDoc.exists()) {
           console.log(`[Leaderboard Update] Verification successful, entry created with data:`, verifyDoc.data());
         } else {
-          console.error(`[Leaderboard Update] Verification failed, entry not created`);
+          // Эта ситуация очень маловероятна после успешного setDoc, но добавим лог
+          console.error(`[Leaderboard Update] Verification failed! setDoc succeeded but entry not found for ${safeNickname}`);
         }
       } catch (error) {
-        console.error(`[Leaderboard Update] Error creating leaderboard entry:`, error);
+        console.error(`[Leaderboard Update] !!! CRITICAL ERROR setting initial leaderboard entry for ${safeNickname}:`, error);
+        // Дополнительно логируем данные, которые пытались записать
+        console.error(`[Leaderboard Update] Data that failed to write:`, leaderboardEntry);
       }
-       
-      return currentSessionRating; 
+
+      return currentSessionRating;
     }
 
     // 4. Считаем СУММАРНЫЕ и СРЕДНИЕ значения по ВСЕМ сессиям
@@ -451,21 +454,24 @@ export const updateLeaderboard = async (
       }
     };
     console.log('[Leaderboard Update] Data to save:', leaderboardData);
-    
+    console.log(`[Leaderboard Update] Attempting to setDoc for average entry: ${safeNickname}`, leaderboardData); // Лог перед записью
     try {
       // Используем setDoc вместо updateDoc для гарантированного создания или обновления
       await setDoc(leaderboardRef, leaderboardData);
-      console.log(`[Leaderboard Update] Leaderboard document for ${safeNickname} updated successfully with ${completedRounds} rounds`);
-      
+      console.log(`[Leaderboard Update] Successfully setDoc for average entry: ${safeNickname}`);
+
       // Проверяем, что запись действительно обновилась
       const verifyDoc = await getDoc(leaderboardRef);
       if (verifyDoc.exists()) {
         console.log(`[Leaderboard Update] Verification successful, entry updated with data:`, verifyDoc.data());
       } else {
-        console.error(`[Leaderboard Update] Verification failed, entry not updated`);
+        // Эта ситуация очень маловероятна после успешного setDoc, но добавим лог
+        console.error(`[Leaderboard Update] Verification failed! setDoc succeeded but entry not found after update for ${safeNickname}`);
       }
     } catch (error) {
-      console.error(`[Leaderboard Update] Error updating leaderboard entry:`, error);
+      console.error(`[Leaderboard Update] !!! CRITICAL ERROR setting average leaderboard entry for ${safeNickname}:`, error);
+      // Дополнительно логируем данные, которые пытались записать
+      console.error(`[Leaderboard Update] Data that failed to write:`, leaderboardData);
     }
 
     // 9. Возвращаем РЕЙТИНГ ТЕКУЩЕЙ СЕССИИ (для отображения на CompletionScreen)
@@ -498,12 +504,19 @@ export const updateLeaderboard = async (
       
       // Используем временный ID для отладочной записи, чтобы избежать конфликтов
       const debugNickname = `debug-${safeNickname}`;
-      await setDoc(doc(db, 'leaderboard', debugNickname), debugEntry);
-      console.log('[Leaderboard Update] Created fallback debug entry due to error');
+      const debugRef = doc(db, 'leaderboard', debugNickname); // Используем отдельную ссылку
+      console.log(`[Leaderboard Update] Attempting to setDoc for fallback debug entry: ${debugNickname}`, debugEntry); // Лог перед записью
+      try { // Отдельный try-catch для записи отладочной записи
+        await setDoc(debugRef, debugEntry);
+        console.log('[Leaderboard Update] Successfully setDoc for fallback debug entry');
+      } catch (debugError) {
+         console.error(`[Leaderboard Update] !!! CRITICAL ERROR setting fallback debug entry for ${debugNickname}:`, debugError);
+         console.error(`[Leaderboard Update] Debug data that failed to write:`, debugEntry);
+      }
       return debugRating;
     } catch (fallbackError) {
-      console.error('[Leaderboard Update] Even fallback entry failed:', fallbackError);
-      throw error; // Перебрасываем оригинальную ошибку
+      console.error('[Leaderboard Update] Error creating fallback debug rating calculation:', fallbackError);
+      throw error; // Перебрасываем оригинальную ошибку основного блока
     }
   }
 };
@@ -554,32 +567,32 @@ export const getLeaderboard = async (): Promise<LeaderboardEntryType[]> => {
       console.log(`[Leaderboard] Processing document with ID: ${doc.id}`);
       const data = doc.data();
       console.log('[Leaderboard] Document data:', data);
-      
+
       // Пропускаем диагностические записи и записи отладки
       if (doc.id === '_debug_entry_' || doc.id.startsWith('debug-') || data.isErrorEntry) {
         console.log(`[Leaderboard] Skipping diagnostic/debug entry: ${doc.id}`);
         return; // Пропускаем эту итерацию
       }
+
+      // Базовая проверка необходимых полей
+      if (!data || typeof data.nickname !== 'string' || typeof data.score !== 'number') {
+        console.warn(`[Leaderboard] Skipping invalid entry (missing/wrong type nickname or score): ID=${doc.id}`, data);
+        return;
+      }
       
       // Собираем объект LeaderboardEntryType, беря данные из сохраненного документа
       const entry: LeaderboardEntryType = {
         nickname: data.nickname,
-        totalTimeMs: data.totalTimeMs, // Среднее время
-        score: data.score, // Средний балл
-        roundsCompleted: data.roundsCompleted, // Общее кол-во раундов
-        ratingDetails: data.ratingDetails, // Весь объект деталей рейтинга
-        deviceType: data.deviceType || 'desktop'
+        totalTimeMs: data.totalTimeMs || 0, // Добавим fallback
+        score: data.score,
+        roundsCompleted: data.roundsCompleted || 0, // Добавим fallback
+        ratingDetails: data.ratingDetails, // Может быть null/undefined, это нормально
+        deviceType: data.deviceType || 'desktop' // Добавим fallback
       };
       
-      // Проверка на наличие необходимых полей (для отладки)
-      if (entry.nickname && typeof entry.score === 'number') {
-         entries.push(entry);
-         console.log(`[Leaderboard] Entry added for ${entry.nickname} with score ${entry.score}`);
-      } else {
-         console.warn("[Leaderboard] Skipping invalid leaderboard entry:", data, 
-           "nickname exists:", !!entry.nickname, 
-           "score type:", typeof entry.score);
-      }
+      // Логируем успешно добавленную запись
+      console.log(`[Leaderboard] Entry added for ${entry.nickname} with score ${entry.score}`);
+      entries.push(entry);
     });
     
     // Дополнительная проверка на пустой массив

@@ -18,7 +18,7 @@ import { doc, setDoc, serverTimestamp, getDocs, writeBatch, collection, updateDo
 import { db } from './firebase/config.tsx';
 import { ExperimentExplanation } from './components/trial/ExperimentExplanation';
 import { TrialResult } from './types';
-import { updateParticipantProgress, updateLeaderboard, saveSessionResults } from './firebase/service.tsx';
+import { updateParticipantProgress, updateLeaderboard, saveSessionResults, recalculateLeaderboardScores } from './firebase/service.tsx';
 import { RatingCalculation } from './types';
 
 const theme = createTheme({
@@ -97,6 +97,7 @@ const App = () => {
   const [completedImages, setCompletedImages] = useState<string[]>([]);
   const [roundsCompleted, setRoundsCompleted] = useState(1);
   const [leaderboardRating, setLeaderboardRating] = useState<RatingCalculation | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -360,6 +361,22 @@ const App = () => {
     }
   };
 
+  // Функция для ручного пересчета
+  const handleRecalculate = async () => {
+    if (recalculating) return;
+    console.log('[App] Manual leaderboard recalculation triggered...');
+    setRecalculating(true);
+    try {
+      await recalculateLeaderboardScores();
+      console.log('[App] Manual leaderboard recalculation finished.');
+      // Можно добавить обновление state лидерборда здесь, если нужно
+    } catch (error) {
+      console.error('[App] Error during manual recalculation:', error);
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   if (loading) {
     return (
       <ThemeProvider theme={theme}>
@@ -446,6 +463,21 @@ const App = () => {
         {(!participant || showCompletionScreen) && (
           <DataExport />
         )}
+        <Box sx={{ position: 'fixed', bottom: 10, right: 10, zIndex: 1000 }}>
+          <Button 
+            variant="contained" 
+            color="secondary" 
+            size="small" 
+            onClick={handleRecalculate}
+            disabled={recalculating}
+            sx={{ 
+                boxShadow: 3,
+                textTransform: 'none'
+            }}
+          >
+            {recalculating ? 'Пересчет...' : 'Пересчитать Лидерборд'}
+          </Button>
+        </Box>
         <Container
           disableGutters
           sx={{
