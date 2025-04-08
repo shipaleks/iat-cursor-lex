@@ -2273,6 +2273,9 @@ export async function createSession(
 
 /**
  * Создает испытание для изображения с учетом истории показов и уже использованных слов в текущей сессии
+ * 
+ * УЛУЧШЕНИЕ: Добавлен случайный выбор из группы слов с одинаковым (минимальным) счетчиком показов.
+ * Это обеспечивает более равномерное распределение и увеличивает вероятность показа всех слов.
  */
 function createTrialsForImageWithHistory(
   image: ImageData,
@@ -2340,11 +2343,16 @@ function createTrialsForImageWithHistory(
       word => !usedWords.has(word.word) && !sessionUsedWords.has(word.word)
     );
     if (availableWords.length > 0) {
-      // Сортируем по возрастанию глобального счетчика
-      availableWords.sort((a, b) => getWordCount(a.word) - getWordCount(b.word));
-      selectedWord = availableWords[0].word; // Берем самое редкое
+      // Находим минимальный счетчик показов среди доступных слов
+      const counts = availableWords.map(w => getWordCount(w.word));
+      const minCount = Math.min(...counts);
+      // Отбираем слова с минимальным счетчиком
+      const leastShownWords = availableWords.filter(w => getWordCount(w.word) === minCount);
+      // Выбираем случайное слово из наименее показанных
+      const randomIndex = Math.floor(Math.random() * leastShownWords.length);
+      selectedWord = leastShownWords[randomIndex].word;
       selectedWordType = 'aesthetic';
-      console.log(` -> Chose NEW aesthetic word (globally rarest): ${selectedWord} (count: ${getWordCount(selectedWord)})`);
+      console.log(` -> Chose NEW aesthetic word (from ${leastShownWords.length} with count ${minCount}): ${selectedWord}`);
     }
 
     // Попытка 2: Новое для сессии, СОРТИРОВКА по глобальному счетчику
@@ -2353,20 +2361,32 @@ function createTrialsForImageWithHistory(
         word => !sessionUsedWords.has(word.word)
       );
       if (availableWords.length > 0) {
-        availableWords.sort((a, b) => getWordCount(a.word) - getWordCount(b.word));
-        selectedWord = availableWords[0].word;
+        // Находим минимальный счетчик показов среди доступных для сессии слов
+        const counts = availableWords.map(w => getWordCount(w.word));
+        const minCount = Math.min(...counts);
+        // Отбираем слова с минимальным счетчиком
+        const leastShownWords = availableWords.filter(w => getWordCount(w.word) === minCount);
+        // Выбираем случайное слово из наименее показанных
+        const randomIndex = Math.floor(Math.random() * leastShownWords.length);
+        selectedWord = leastShownWords[randomIndex].word;
         selectedWordType = 'aesthetic';
-        console.log(` -> Chose SESSION-UNUSED aesthetic word (globally rarest): ${selectedWord} (count: ${getWordCount(selectedWord)})`);
+        console.log(` -> Chose SESSION-UNUSED aesthetic word (from ${leastShownWords.length} with count ${minCount}): ${selectedWord}`);
       }
     }
     
     // Попытка 3: Любое слово, СОРТИРОВКА по глобальному счетчику
     if (!selectedWord && AESTHETIC_WORDS.length > 0) {
         availableWords = [...AESTHETIC_WORDS]; // Берем все слова
-        availableWords.sort((a, b) => getWordCount(a.word) - getWordCount(b.word));
-        selectedWord = availableWords[0].word;
+        // Находим минимальный счетчик показов среди всех доступных слов
+        const counts = availableWords.map(w => getWordCount(w.word));
+        const minCount = Math.min(...counts);
+        // Отбираем слова с минимальным счетчиком
+        const leastShownWords = availableWords.filter(w => getWordCount(w.word) === minCount);
+        // Выбираем случайное слово из наименее показанных
+        const randomIndex = Math.floor(Math.random() * leastShownWords.length);
+        selectedWord = leastShownWords[randomIndex].word;
         selectedWordType = 'aesthetic';
-        console.log(` -> Chose ANY available aesthetic word (globally rarest): ${selectedWord} (count: ${getWordCount(selectedWord)})`);
+        console.log(` -> Chose ANY available aesthetic word (from ${leastShownWords.length} with count ${minCount}): ${selectedWord}`);
     }
   }
 
