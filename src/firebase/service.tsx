@@ -638,21 +638,24 @@ export const calculateRating = async (
   const accuracyMultiplier = accuracy * accuracy; // Квадратичное влияние
 
   // 2. Расчет времени
-  const averageTimePerWord = totalTimeMs / totalTrials;
-  const theoreticalMinTimePerWord = 1600; // 1.5 секунды + 100мс погрешность на нажатие
-  const theoreticalMinTime = theoreticalMinTimePerWord * totalTrials;
+  // Обновленные параметры времени на основе реальных данных
+  const minTotalTimeMs = 80000; // 80 секунд минимальное время на весь эксперимент
+  const theoreticalMinTimePerWord = minTotalTimeMs / 50; // Примерно 1600 мс на слово (при 50 словах)
+  const theoreticalMinTime = minTotalTimeMs;
+  
   let timeScore = 0;
-  if (averageTimePerWord <= theoreticalMinTimePerWord) {
+  // Оптимальное время - 80 секунд, максимум баллов
+  if (totalTimeMs <= minTotalTimeMs) {
     timeScore = 15; // Макс баллы, если время <= оптимального
   } else {
-    // Шкала убывания от 15 до 0 баллов при увеличении времени от 1.6с до 4с
-    const maxTimeThreshold = 4000; 
-    if (averageTimePerWord < maxTimeThreshold) {
-      const timeDiff = averageTimePerWord - theoreticalMinTimePerWord;
-      const maxDiff = maxTimeThreshold - theoreticalMinTimePerWord;
+    // Шкала убывания от 15 до 0 баллов при увеличении времени
+    const maxTimeThreshold = 180000; // 180 секунд (3 минуты) - порог для 0 баллов
+    if (totalTimeMs < maxTimeThreshold) {
+      const timeDiff = totalTimeMs - minTotalTimeMs;
+      const maxDiff = maxTimeThreshold - minTotalTimeMs;
       timeScore = 15 * (1 - timeDiff / maxDiff);
     }
-    // Если время >= 4с, timeScore остается 0
+    // Если время >= maxTimeThreshold, timeScore остается 0
   }
   timeScore = Math.max(0, Math.round(timeScore)); // Округляем и ограничиваем снизу
 
