@@ -341,12 +341,25 @@ export const updateLeaderboard = async (
     // --- Лог №5: После запроса сессий ---
     console.log(`[LB Update] Found ${sessionsData.length} sessions.`);
 
-    // Вычисляем количество завершенных раундов
-    let completedRounds = Math.max(
-      currentRounds,
-      sessionsData.length + 1
-    );
-    console.log(`[LB Update] Initial calculation of completed rounds: ${completedRounds}`);
+    // Исправленная логика вычисления completedRounds
+    let completedRounds = 1; // По умолчанию первый раунд
+    
+    if (sessionsData.length > 0) {
+      // Если у нас есть сессии, это означает что текущая сессия - следующая
+      // Для первой сохраненной сессии (когда sessionsData.length = 0): completedRounds = 1
+      // Для второй сессии (sessionsData.length = 1): completedRounds = 2
+      // Для третьей сессии (sessionsData.length = 2): completedRounds = 3
+      completedRounds = sessionsData.length + 1;
+    }
+    
+    // Для диагностики сравниваем с значением из прогресса пользователя
+    console.log(`[LB Update] Calculated rounds: ${completedRounds} (из прогресса: ${currentRounds}, из сессий: ${sessionsData.length})`);
+    
+    // Проверка: если из прогресса приходит большее значение, используем его
+    if (currentRounds > completedRounds) {
+      console.log(`[LB Update] WARNING: Progress rounds (${currentRounds}) > calculated (${completedRounds}), using progress value`);
+      completedRounds = currentRounds;
+    }
 
     // --- Лог №6: Перед проверкой существующей записи ЛБ ---
     console.log(`[LB Update] Checking existing LB entry for ID: ${safeNickname}`);
@@ -405,15 +418,6 @@ export const updateLeaderboard = async (
     const totalTimeMsAllSessions = sessionsData.reduce((sum, session) => sum + (session.totalTimeMs || 0), 0);
     const averageTimeMs = totalTimeMsAllSessions / totalSessions;
     console.log(`[LB Update] Totals across ${totalSessions} sessions: Trials=${totalTrialsAllSessions}, Correct=${totalCorrectTrialsAllSessions}, Time=${totalTimeMsAllSessions}ms, AvgTime=${averageTimeMs.toFixed(0)}ms`);
-
-    // Корректировка completedRounds - убедимся, что это точно число сессий + 1 (текущая)
-    // Это решает проблему с неправильным отображением количества раундов в лидерборде
-    const correctedRounds = totalSessions + 1;
-    if (correctedRounds !== completedRounds) {
-      console.log(`[LB Update] Корректировка количества раундов: ${completedRounds} -> ${correctedRounds} (на основе ${totalSessions} предыдущих сессий + текущая)`);
-      // Используем скорректированное значение
-      completedRounds = correctedRounds;
-    }
 
     // 5. Получаем детальную статистику по словам для calculateRating
     let realWordTrials = 0;
@@ -887,12 +891,6 @@ export const calculateRating = async (
   // 4. Расчет бонуса (исправлено)
   // Гарантируем, что roundsCompleted >= 1
   const actualRoundsCompleted = Math.max(1, roundsCompleted || 1);
-  
-  // ПРИМЕЧАНИЕ: Бонус рассчитывается так:
-  // - Первый раунд = +0% (базовые 100%)
-  // - Второй раунд = +5% (всего 105%)
-  // - Третий раунд = +10% (всего 110%)
-  // - и т.д.
   
   // Бонус: 0% за первый раунд, +5% за каждый следующий раунд
   // Первый раунд (actualRoundsCompleted == 1) => additionalBonusPercent = 0
