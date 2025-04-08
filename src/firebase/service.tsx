@@ -69,16 +69,16 @@ export const getParticipantProgressByNickname = async (nickname: string, forceNe
     // If we want to force new progress, skip nickname lookup
     if (!forceNewProgress) {
       // Check for existing nickname
-      const nicknameDoc = await getDoc(doc(db, 'nicknames', nickname));
-      
-      if (nicknameDoc.exists()) {
+    const nicknameDoc = await getDoc(doc(db, 'nicknames', nickname));
+    
+    if (nicknameDoc.exists()) {
         // Found existing nickname mapping
-        const userId = nicknameDoc.data().userId;
+      const userId = nicknameDoc.data().userId;
         console.log('Found existing user ID in nicknames:', userId);
-        
+      
         // Get progress by userId
-        const progressDoc = await getDoc(doc(db, 'progress', userId));
-        if (progressDoc.exists()) {
+      const progressDoc = await getDoc(doc(db, 'progress', userId));
+      if (progressDoc.exists()) {
           const progress = progressDoc.data() as ParticipantProgressType;
           console.log('Loaded existing progress for nickname', nickname, 'with', progress.completedImages?.length || 0, 'completed images');
           
@@ -97,15 +97,15 @@ export const getParticipantProgressByNickname = async (nickname: string, forceNe
             progress.userId = userId;
           }
           
-          return {
-            userId,
-            progress: {
-              ...progress,
+        return {
+          userId,
+          progress: {
+            ...progress,
               userId: progress.userId || userId,
-              completedImages: Array.isArray(progress.completedImages) ? progress.completedImages : []
-            }
-          };
-        } else {
+            completedImages: Array.isArray(progress.completedImages) ? progress.completedImages : []
+          }
+        };
+      } else {
           console.warn('Found nickname mapping but no progress document for userId', userId);
         }
       } else {
@@ -215,9 +215,9 @@ export const updateParticipantProgress = async (
 
       // --- Подготовка данных для обновления --- 
       const updateData: Partial<ParticipantProgressType> = {
-        nickname: participantNickname,
+      nickname: participantNickname,
         userId: participantId,
-        completedImages: allCompletedImages,
+      completedImages: allCompletedImages,
         totalSessions: newTotalSessions,
         lastSessionTimestamp: serverTimestamp(),
         imagesSeenWithRealWord: allImagesSeenWithRealWord,
@@ -270,7 +270,7 @@ export async function saveTrialResult(result: TrialResult, participantId: string
   } catch (error) {
     // Только базовый лог ошибки для диагностики
     console.error('Error saving trial result:', error);
-    throw error; 
+    throw error;
   }
 }
 
@@ -380,7 +380,7 @@ export const updateLeaderboard = async (
 
       const leaderboardRef = doc(db, 'leaderboard', safeNickname);
       const leaderboardEntry = {
-        nickname,
+      nickname,
         participantId,
         score: currentSessionRating.finalScore,
         accuracy: currentSessionRating.accuracy,
@@ -1019,116 +1019,126 @@ export const updateGlobalImageStats = async (imageFileNames: string[]): Promise<
   }
 };
 
-// Функция для сброса и коррекции количества раундов в лидерборде
-export const resetLeaderboardRounds = async () => {
-  console.log('[Reset Rounds] Starting reset of leaderboard rounds...');
+// Сбрасывает счетчики раундов для всего лидерборда
+export const resetLeaderboardRounds = async (): Promise<void> => {
+  console.log('[Reset Rounds] Starting reset leaderboard rounds operation');
   try {
-    const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
-    console.log(`[Reset Rounds] Found ${leaderboardSnapshot.size} entries in leaderboard.`);
-
-    let updatedCount = 0;
-    const batch = writeBatch(db);
+    const leaderboardRef = collection(db, 'leaderboard');
+    const snapshot = await getDocs(leaderboardRef);
     
-    for (const doc of leaderboardSnapshot.docs) {
-      // Пропускаем диагностические/отладочные записи
-      if (doc.id === '_debug_entry_' || doc.id.startsWith('debug-')) {
-        console.log(`[Reset Rounds] Skipping diagnostic entry: ${doc.id}`);
+    let updatedCount = 0;
+    const updates: Promise<void>[] = [];
+
+    for (const leaderboardDoc of snapshot.docs) {
+      // Пропускаем диагностические записи
+      if (leaderboardDoc.id === 'diagnostic') {
+        console.log('[Reset Rounds] Skipping diagnostic entry');
         continue;
       }
 
-      const data = doc.data();
+      const data = leaderboardDoc.data();
       const participantId = data.participantId;
       
-      // Если нет participantId, пропускаем
+      // Если нет ID участника, пропускаем
       if (!participantId) {
-        console.warn(`[Reset Rounds] Skipping entry without participantId: ${doc.id}`);
+        console.log('[Reset Rounds] No participantId found, skipping entry');
         continue;
       }
 
       // 1. Получаем данные из progress (считается наиболее достоверным источником)
-      const progressDoc = await getDoc(doc(db, 'progress', participantId));
       let progressRounds = 0;
-      if (progressDoc.exists()) {
-        const progressData = progressDoc.data();
-        progressRounds = progressData.totalSessions || 0;
-        console.log(`[Reset Rounds] Progress rounds for ${participantId}: ${progressRounds}`);
-      } else {
-        console.log(`[Reset Rounds] No progress document found for ${participantId}`);
+      try {
+        const progressRef = doc(db, 'progress', participantId);
+        const progressDoc = await getDoc(progressRef);
+        if (progressDoc.exists()) {
+          const progressData = progressDoc.data() as { totalSessions?: number };
+          progressRounds = progressData.totalSessions || 0;
+          console.log(`[Reset Rounds] Progress data found for ${participantId}: totalSessions=${progressRounds}`);
+        } else {
+          console.log(`[Reset Rounds] No progress data found for ${participantId}`);
+        }
+      } catch (err) {
+        console.error(`[Reset Rounds] Error getting progress for ${participantId}:`, err);
       }
 
-      // 2. Получаем сессии для точного подсчета (запасной вариант)
-      const sessionsQuery = query(
-        collection(db, 'sessions'),
-        where('participantId', '==', participantId)
-      );
-      const sessionsSnapshot = await getDocs(sessionsQuery);
-      const sessionCount = sessionsSnapshot.size;
-      console.log(`[Reset Rounds] Session count for ${participantId}: ${sessionCount}`);
-      
-      // АЛГОРИТМ ВЫБОРА ПРАВИЛЬНОГО ЗНАЧЕНИЯ:
-      // 1. Если в progress есть totalSessions, используем его
-      // 2. Если totalSessions не найден или равен 0, используем количество сессий
-      // 3. Если сессий нет, устанавливаем 1 (минимальное значение)
-      
-      const correctRounds = progressRounds > 0 ? progressRounds : Math.max(1, sessionCount);
-      
-      console.log(`[Reset Rounds] User ${doc.id}: Progress=${progressRounds}, Sessions=${sessionCount}, Old rounds=${data.roundsCompleted || 0}, Final rounds=${correctRounds}`);
-      
-      // Только для диагностики
-      if (correctRounds !== data.roundsCompleted) {
-        console.log(`[Reset Rounds] UPDATING rounds for ${doc.id} from ${data.roundsCompleted} to ${correctRounds}`);
+      // 2. Получаем данные из sessions (второй источник)
+      let sessionsCount = 0;
+      try {
+        const sessionsRef = collection(db, 'sessions');
+        const sessionsQuery = query(sessionsRef, where('participantId', '==', participantId));
+        const sessionsSnapshot = await getDocs(sessionsQuery);
+        sessionsCount = sessionsSnapshot.size;
+        console.log(`[Reset Rounds] Found ${sessionsCount} sessions for ${participantId}`);
+      } catch (err) {
+        console.error(`[Reset Rounds] Error counting sessions for ${participantId}:`, err);
       }
+
+      // 3. Сравниваем с текущим значением в leaderboard
+      const currentRounds = data.roundsCompleted || 0;
       
-      // Принудительно обновляем запись, даже если данные не изменились
-      // (чтобы убедиться, что обновление работает)
+      // Находим максимальное значение
+      const maxRounds = Math.max(progressRounds, sessionsCount, currentRounds);
+      console.log(`[Reset Rounds] Determined maxRounds=${maxRounds} for ${participantId} (progress=${progressRounds}, sessions=${sessionsCount}, current=${currentRounds})`);
       
-      // Обновляем основное поле roundsCompleted
-      batch.update(doc.ref, { roundsCompleted: correctRounds });
-      
-      // Если есть ratingDetails, обновляем и там
-      if (data.ratingDetails) {
-        batch.update(doc.ref, { 'ratingDetails.roundsCompleted': correctRounds });
+      // Обновляем только если есть изменения
+      if (maxRounds !== currentRounds) {
+        console.log(`[Reset Rounds] Updating ${participantId} roundsCompleted from ${currentRounds} to ${maxRounds}`);
+        
+        // Обновляем также детали рейтинга, если есть
+        let ratingDetails = data.ratingDetails || {};
+        
+        // Если есть детали рейтинга, обновляем их полностью с пересчетом бонуса
+        if (ratingDetails && typeof ratingDetails === 'object') {
+          // Пересчитываем бонус
+          const additionalBonusPercent = (maxRounds - 1) * 5;
+          const cappedBonusPercent = Math.min(additionalBonusPercent, 25 * 5);
+          const baseBonusPercent = 100;
+          const finalBonusPercentage = baseBonusPercent + cappedBonusPercent;
+          const finalRoundBonusMultiplier = finalBonusPercentage / 100;
+          
+          // Пересчитываем базовый рейтинг (если он есть)
+          const baseRating = ratingDetails.rating || 0;
+          const finalScore = Math.round(baseRating * finalRoundBonusMultiplier);
+          
+          console.log(`[Reset Rounds] Recalculating bonus: rounds=${maxRounds}, bonus=${cappedBonusPercent}%, multiplier=${finalRoundBonusMultiplier}, baseScore=${baseRating}, finalScore=${finalScore}`);
+          
+          // Обновляем все значения, связанные с бонусом
+          ratingDetails = {
+            ...ratingDetails,
+            roundsCompleted: maxRounds,
+            bonusPercentage: finalBonusPercentage,
+            roundBonus: finalRoundBonusMultiplier,
+            finalScore: finalScore
+          };
+        }
+        
+        // Добавляем обновление в очередь
+        updates.push(
+          updateDoc(leaderboardDoc.ref, {
+            roundsCompleted: maxRounds,
+            ratingDetails: ratingDetails,
+            // Также обновляем основной score
+            score: ratingDetails.finalScore || 0
+          })
+        );
+        updatedCount++;
+      } else {
+        console.log(`[Reset Rounds] No update needed for ${participantId} (rounds=${currentRounds})`);
       }
-      
-      // Также обновляем поля score и bonusPercentage для согласованности
-      if (data.ratingDetails) {
-        // Получаем базовый рейтинг без бонуса
-        const baseScore = data.ratingDetails.rating || 0;
-        
-        // Рассчитываем новый бонус на основе correctRounds
-        const bonusPercent = (correctRounds - 1) * 5; // +5% за каждый раунд после первого
-        const cappedBonusPercent = Math.min(bonusPercent, 25 * 5); // максимум 125%
-        const totalBonusPercent = 100 + cappedBonusPercent;
-        const bonusMultiplier = totalBonusPercent / 100;
-        
-        // Рассчитываем новый итоговый счет
-        const newFinalScore = Math.round(baseScore * bonusMultiplier);
-        
-        // Обновляем все связанные поля
-        batch.update(doc.ref, { 
-          score: newFinalScore,
-          'ratingDetails.bonusPercentage': totalBonusPercent,
-          'ratingDetails.roundBonus': bonusMultiplier,
-          'ratingDetails.finalScore': newFinalScore
-        });
-        
-        console.log(`[Reset Rounds] Also updating score for ${doc.id}: baseScore=${baseScore}, bonus=${cappedBonusPercent}%, newScore=${newFinalScore}`);
-      }
-      
-      updatedCount++;
     }
     
-    // Применяем все обновления одним батчем
-    if (updatedCount > 0) {
-      await batch.commit();
-      console.log(`[Reset Rounds] Successfully updated ${updatedCount} entries.`);
+    // Выполняем все обновления
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.log(`[Reset Rounds] Successfully updated ${updatedCount} leaderboard entries`);
     } else {
-      console.log('[Reset Rounds] No entries needed updating.');
+      console.log('[Reset Rounds] No updates were needed');
     }
     
-    return { success: true, updatedCount };
+    console.log('[Reset Rounds] Rounds reset operation completed successfully');
+    return Promise.resolve();
   } catch (error) {
-    console.error('[Reset Rounds] Error resetting leaderboard rounds:', error);
-    return { success: false, error };
+    console.error('[Reset Rounds] Error during rounds reset operation:', error);
+    return Promise.reject(error);
   }
 }; 
