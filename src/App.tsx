@@ -87,6 +87,14 @@ const theme = createTheme({
   }
 });
 
+// Определение типа устройства
+const checkIsMobile = (): boolean => {
+    if (typeof navigator !== 'undefined') {
+        return /Mobi|Android/i.test(navigator.userAgent);
+    }
+    return false; // По умолчанию считаем, что не мобильное, если navigator недоступен
+};
+
 const App = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -220,17 +228,26 @@ const App = () => {
     }
   };
 
-  const handleExperimentComplete = async (stats: ExperimentStats, trialsData: TrialResult[]) => {
-    setExperimentStats(stats);
-    console.log('[App] Experiment complete. Stats:', stats, 'Trials:', trialsData.length);
-
+  // Хендлер завершения эксперимента
+  const handleExperimentComplete = async (stats: { total: number; correct: number; totalTimeMs: number; }, trialsData: TrialResult[]) => {
+    // --- Лог №1 (App): Начало обработки завершения --- 
+    console.log(`[App COMPLETE START] Received stats:`, stats, `Trials data length: ${trialsData.length}`);
     setShowCompletionScreen(true);
-    navigate('/completion');
-    
+    setExperimentStats({
+      total: stats.total,
+      correct: stats.correct,
+      totalTimeMs: stats.totalTimeMs
+    });
+
+    const user = auth.currentUser;
+    // --- Лог №2 (App): Проверка user и participant --- 
+    console.log(`[App COMPLETE] User authenticated: ${!!user}, Participant exists: ${!!participant}`);
+
     if (user && participant) {
+      const device = checkIsMobile() ? 'mobile' : 'desktop'; // Используем исправленную функцию
+      // --- Лог №3 (App): Перед сохранением сессии --- 
+      console.log(`[App COMPLETE] Saving session results for ${participant.nickname}`);
       try {
-        // Сохраняем результаты сессии в Firestore
-        const device = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
         await saveSessionResults(
           user.uid,
           stats.total,
@@ -239,58 +256,63 @@ const App = () => {
           participant.nickname,
           device
         );
-        console.log('[App] Session results saved to Firestore');
-        
-        // Получаем текущее количество сессий до обновления прогресса
+        // --- Лог №4 (App): Сессия успешно сохранена --- 
+        console.log(`[App COMPLETE] Session results saved successfully.`);
+      } catch (error) {
+        console.error("[App COMPLETE ERROR] Error saving session results:", error);
+      }
+
+      // --- Лог №5 (App): Перед обновлением прогресса --- 
+      console.log(`[App COMPLETE] Updating participant progress for ${participant.nickname} with ${trialsData.length} trials.`); // Используем trialsData
+      try {
         const progressBeforeUpdate = await getParticipantProgress(user.uid);
         const sessionsBeforeUpdate = progressBeforeUpdate?.totalSessions || 0;
-        console.log(`[App] Current totalSessions before update: ${sessionsBeforeUpdate}`);
-        
-        // Передаем participantId, nickname и trialsData
+        console.log(`[App COMPLETE] Total sessions BEFORE progress update: ${sessionsBeforeUpdate}`);
+
+        // Передаем trialsData в updateParticipantProgress
         await updateParticipantProgress(user.uid, participant.nickname, trialsData);
         
-        // Проверяем, что totalSessions обновились после updateParticipantProgress
+        // --- Лог №6 (App): Прогресс успешно обновлен, проверка сессий --- 
+        console.log(`[App COMPLETE] Participant progress updated. Verifying session count...`);
         const progressAfterUpdate = await getParticipantProgress(user.uid);
         const sessionsAfterUpdate = progressAfterUpdate?.totalSessions || 0;
-        console.log(`[App] Updated totalSessions after progress update: ${sessionsAfterUpdate}`);
+        console.log(`[App COMPLETE] Total sessions AFTER progress update: ${sessionsAfterUpdate}`);
         
-        // Если по какой-то причине количество сессий не увеличилось, принудительно увеличиваем его
         if (sessionsAfterUpdate <= sessionsBeforeUpdate) {
-          console.warn(`[App] totalSessions did not increase, forcing update (${sessionsBeforeUpdate} -> ${sessionsBeforeUpdate + 1})`);
-          
-          // Принудительно обновляем количество сессий
+          console.warn(`[App COMPLETE WARN] totalSessions did not increase, forcing update (${sessionsBeforeUpdate} -> ${sessionsBeforeUpdate + 1})`);
           const progressRef = doc(db, 'progress', user.uid);
           await updateDoc(progressRef, {
             totalSessions: sessionsBeforeUpdate + 1,
             lastSessionTimestamp: serverTimestamp()
           });
         }
-        
-        // Обновляем leaderboard ПОСЛЕ обновления прогресса
-        // Передаем nickname, participantId, stats и deviceType
-        console.log(`[App] Updating leaderboard for ${participant.nickname} with stats:`, stats);
-        
-        // Приводим никнейм к нижнему регистру для согласованности
+
+        // --- Лог №7 (App): Перед вызовом updateLeaderboard --- 
         const normalizedNickname = participant.nickname.toLowerCase();
-        console.log(`[App] Using normalized nickname for leaderboard: '${normalizedNickname}'`);
+        console.log(`[App COMPLETE] === Calling updateLeaderboard with Nick: ${normalizedNickname}, UID: ${user.uid}, Correct: ${stats.correct}, Total: ${stats.total}, Time: ${stats.totalTimeMs}, Device: ${device} ===`);
         
         const ratingData = await updateLeaderboard(
-          normalizedNickname, 
-          user.uid, 
-          stats.correct,
-          stats.total,
-          stats.totalTimeMs,
+          normalizedNickname,
+          user.uid,
+          stats.correct, // Берем из stats
+          stats.total,   // Берем из stats
+          stats.totalTimeMs, // Берем из stats
           device
         );
         setLeaderboardRating(ratingData);
-        console.log("[App] Leaderboard rating updated after progress save:", ratingData);
+        // --- Лог №8 (App): После вызова updateLeaderboard --- 
+        console.log("[App COMPLETE] Leaderboard update call finished. Returned rating data:", ratingData);
         
       } catch (error) {
-        console.error("[App] Error updating progress or leaderboard:", error);
+        // --- Лог №9 (App): Ошибка при обновлении прогресса или лидерборда --- 
+        console.error("[App COMPLETE ERROR] Error during progress or leaderboard update:", error);
       }
     } else {
-      console.warn("[App] User or participant not available on experiment complete.")
+      // --- Лог №10 (App): Пользователь или участник недоступен --- 
+      console.warn("[App COMPLETE WARN] User or participant not available on experiment complete.")
     }
+    // --- Лог №11 (App): Конец обработки завершения --- 
+    console.log(`[App COMPLETE END] Finished handling experiment completion.`);
   };
 
   const handleStartNewSession = () => {

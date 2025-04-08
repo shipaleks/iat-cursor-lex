@@ -307,92 +307,93 @@ export const saveSessionResults = async (
 
 // Обновленная функция updateLeaderboard с расчетом сбалансированной точности
 export const updateLeaderboard = async (
-  nickname: string, 
-  participantId: string, 
+  nickname: string,
+  participantId: string,
   correctTrials: number, // Correct trials for the *current* session
   totalTrials: number,   // Total trials for the *current* session
   totalTimeMs: number,   // Total time for the *current* session
   deviceType: 'mobile' | 'desktop'
 ): Promise<RatingCalculation> => {
-  console.log(`[Leaderboard Update] Starting for ${nickname} (${participantId})`);
-  
-  // Проверяем и нормализуем никнейм для безопасного использования в качестве ID документа
+  // --- Лог №1: Начало функции ---
+  console.log(`[LB Update START] Nick: ${nickname}, PID: ${participantId}, Trials: ${correctTrials}/${totalTrials}, Time: ${totalTimeMs}, Device: ${deviceType}`);
+
   const safeNickname = nickname.replace(/[^a-zA-Z0-9-_]/g, '_').toLowerCase();
   if (safeNickname !== nickname) {
-    console.log(`[Leaderboard Update] Normalized nickname from '${nickname}' to safe ID '${safeNickname}'`);
+    console.log(`[LB Update] Normalized nickname to safe ID '${safeNickname}'`);
   }
-  
-  try {
-    // 1. Сначала получаем текущий прогресс для точного подсчета раундов
-    const existingProgress = await getParticipantProgress(participantId);
-    const currentRounds = Math.max(1, existingProgress?.totalSessions || 0);
-    console.log(`[Leaderboard Update] Current rounds from progress: ${currentRounds}`);
 
-    // 2. Получаем ВСЕ сессии пользователя, чтобы посчитать средние значения
+  try {
+    // --- Лог №2: Перед получением прогресса ---
+    console.log(`[LB Update] Getting participant progress for PID: ${participantId}`);
+    const existingProgress = await getParticipantProgress(participantId);
+    // --- Лог №3: После получения прогресса ---
+    console.log(`[LB Update] Got progress. Total sessions from progress: ${existingProgress?.totalSessions}`);
+    const currentRounds = Math.max(1, existingProgress?.totalSessions || 0);
+
+    // --- Лог №4: Перед запросом сессий ---
+    console.log(`[LB Update] Querying sessions for PID: ${participantId}`);
     const sessionsQuery = query(
       collection(db, 'sessions'),
-      where('participantId', '==', participantId) // Используем ID для надежности
+      where('participantId', '==', participantId)
     );
     const sessionsSnapshot = await getDocs(sessionsQuery);
     const sessionsData = sessionsSnapshot.docs.map(doc => doc.data());
-    console.log(`[Leaderboard Update] Found ${sessionsData.length} previous sessions.`);
+    // --- Лог №5: После запроса сессий ---
+    console.log(`[LB Update] Found ${sessionsData.length} sessions.`);
 
-    // 3. Определяем корректное количество раундов (берем максимальное из всех источников)
-    let completedRounds = Math.max(
+    const completedRounds = Math.max(
       currentRounds,
       sessionsData.length + 1
     );
-    console.log(`[Leaderboard Update] Final rounds calculation: max(${currentRounds}, ${sessionsData.length + 1}) = ${completedRounds}`);
+    console.log(`[LB Update] Calculated completed rounds: ${completedRounds}`);
 
-    // Проверяем, существует ли уже запись в лидерборде
+    // --- Лог №6: Перед проверкой существующей записи ЛБ ---
+    console.log(`[LB Update] Checking existing LB entry for ID: ${safeNickname}`);
     const existingLeaderboardDoc = await getDoc(doc(db, 'leaderboard', safeNickname));
-    console.log(`[Leaderboard Update] Existing leaderboard entry exists: ${existingLeaderboardDoc.exists()}`);
-    
+    console.log(`[LB Update] Existing LB entry exists: ${existingLeaderboardDoc.exists()}`);
+
+    // Расчет рейтинга (перенесен внутрь блоков if/else, где он нужен)
+    let currentSessionRating: RatingCalculation;
+    let averageRating: RatingCalculation;
+
     if (sessionsData.length === 0) {
-      console.warn(`[Leaderboard Update] No sessions found for ${safeNickname}, calculating for current session only.`);
-      // Вычисляем рейтинг для текущей сессии и записываем в лидерборд
-      const currentSessionRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, completedRounds);
-      console.log(`[Leaderboard Update] Rating for current session only:`, currentSessionRating);
-      
-      // Важно! Создаем запись в лидерборде даже если это первый раунд
+      // --- Лог №7a: Расчет для первой сессии ---
+      console.log(`[LB Update] Calculating rating for FIRST session.`);
+      currentSessionRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, completedRounds);
+      console.log(`[LB Update] First session rating calculated.`);
+
       const leaderboardRef = doc(db, 'leaderboard', safeNickname);
       const leaderboardEntry = {
-        nickname, // Сохраняем оригинальный никнейм для отображения
+        nickname,
         participantId,
         score: currentSessionRating.finalScore,
         accuracy: currentSessionRating.accuracy,
         totalTimeMs: totalTimeMs,
-        roundsCompleted: completedRounds, // Используем точное количество раундов
+        roundsCompleted: completedRounds,
         deviceType: deviceType,
         ratingDetails: currentSessionRating,
         lastUpdated: serverTimestamp(),
         totalTrials: totalTrials,
         correctTrials: correctTrials
       };
-      // Дополнительная проверка перед записью
       if (!participantId) {
-          console.error(`[Leaderboard Update] !!! CRITICAL: Attempting to write initial entry for ${safeNickname} WITHOUT participantId!`, leaderboardEntry);
+        console.error(`[LB Update] !!! CRITICAL: Attempting to write initial entry for ${safeNickname} WITHOUT participantId!`, leaderboardEntry);
       }
-      console.log(`[Leaderboard Update] Attempting to setDoc for initial entry: ${safeNickname}`, leaderboardEntry); // Лог перед записью
+      console.log(`[LB Update] Attempting FIRST session setDoc for ${safeNickname}`, leaderboardEntry);
       try {
-        // Используем setDoc вместо updateDoc для гарантированного создания или обновления
         await setDoc(leaderboardRef, leaderboardEntry);
-        console.log(`[Leaderboard Update] Successfully setDoc for initial entry: ${safeNickname}`);
+        console.log(`[LB Update] Successfully setDoc FIRST session for ${safeNickname}`);
 
-        // Проверяем, что запись действительно создалась
         const verifyDoc = await getDoc(leaderboardRef);
         if (verifyDoc.exists()) {
-          console.log(`[Leaderboard Update] Verification successful, entry created with data:`, verifyDoc.data());
+          console.log(`[LB Update] Verification successful, entry created with data:`, verifyDoc.data());
         } else {
-          // Эта ситуация очень маловероятна после успешного setDoc, но добавим лог
-          console.error(`[Leaderboard Update] Verification failed! setDoc succeeded but entry not found for ${safeNickname}`);
+          console.error(`[LB Update] Verification failed! setDoc succeeded but entry not found for ${safeNickname}`);
         }
       } catch (error) {
-        console.error(`[Leaderboard Update] !!! CRITICAL ERROR setting initial leaderboard entry for ${safeNickname}:`, error);
-        // Дополнительно логируем данные, которые пытались записать
-        console.error(`[Leaderboard Update] Data that failed to write:`, leaderboardEntry);
+        console.error(`[LB Update] !!! CRITICAL ERROR setting initial leaderboard entry for ${safeNickname}:`, error);
+        console.error(`[LB Update] Data that failed to write:`, leaderboardEntry);
       }
-
       return currentSessionRating;
     }
 
@@ -402,7 +403,7 @@ export const updateLeaderboard = async (
     const totalTrialsAllSessions = sessionsData.reduce((sum, session) => sum + (session.totalTrials || 0), 0);
     const totalTimeMsAllSessions = sessionsData.reduce((sum, session) => sum + (session.totalTimeMs || 0), 0);
     const averageTimeMs = totalTimeMsAllSessions / totalSessions;
-    console.log(`[Leaderboard Update] Totals across ${totalSessions} sessions: Trials=${totalTrialsAllSessions}, Correct=${totalCorrectTrialsAllSessions}, Time=${totalTimeMsAllSessions}ms, AvgTime=${averageTimeMs.toFixed(0)}ms`);
+    console.log(`[LB Update] Totals across ${totalSessions} sessions: Trials=${totalTrialsAllSessions}, Correct=${totalCorrectTrialsAllSessions}, Time=${totalTimeMsAllSessions}ms, AvgTime=${averageTimeMs.toFixed(0)}ms`);
 
     // 5. Получаем детальную статистику по словам для calculateRating
     let realWordTrials = 0;
@@ -415,11 +416,11 @@ export const updateLeaderboard = async (
       nonWordTrials += session.nonWordTrials || 0;
       correctNonWordTrials += session.correctNonWordTrials || 0;
     });
-    console.log(`[Leaderboard Update] Word type stats: Real=${correctRealWordTrials}/${realWordTrials}, NonWord=${correctNonWordTrials}/${nonWordTrials}`);
+    console.log(`[LB Update] Word type stats: Real=${correctRealWordTrials}/${realWordTrials}, NonWord=${correctNonWordTrials}/${nonWordTrials}`);
 
     // 6. Рассчитываем СРЕДНИЙ рейтинг по ВСЕМ сессиям
-    console.log(`[Leaderboard Update] Calculating AVERAGE rating with: totalTrials=${totalTrialsAllSessions}, correctTrials=${totalCorrectTrialsAllSessions}, avgTimeMs=${averageTimeMs}, rounds=${completedRounds}`);
-    const averageRating = await calculateRating(
+    console.log(`[LB Update] Calculating AVERAGE rating with: totalTrials=${totalTrialsAllSessions}, correctTrials=${totalCorrectTrialsAllSessions}, avgTimeMs=${averageTimeMs}, rounds=${completedRounds}`);
+    averageRating = await calculateRating(
       totalTrialsAllSessions,
       totalCorrectTrialsAllSessions,
       averageTimeMs, // Передаем СРЕДНЕЕ время
@@ -429,11 +430,11 @@ export const updateLeaderboard = async (
       nonWordTrials,
       correctNonWordTrials
     );
-    console.log(`[Leaderboard Update] Calculated AVERAGE rating:`, averageRating);
+    console.log(`[LB Update] Calculated AVERAGE rating:`, averageRating);
 
     // 7. Определяем последний тип устройства
     const latestDeviceType = deviceType;
-    console.log(`[Leaderboard Update] Using device type: ${latestDeviceType}`);
+    console.log(`[LB Update] Using device type: ${latestDeviceType}`);
 
     // 8. Обновляем запись в таблице лидеров СРЕДНИМ рейтингом
     const leaderboardRef = doc(db, 'leaderboard', safeNickname);
@@ -459,72 +460,74 @@ export const updateLeaderboard = async (
     };
     // Дополнительная проверка перед записью
     if (!participantId) {
-        console.error(`[Leaderboard Update] !!! CRITICAL: Attempting to write average entry for ${safeNickname} WITHOUT participantId!`, leaderboardData);
+        console.error(`[LB Update] !!! CRITICAL: Attempting to write average entry for ${safeNickname} WITHOUT participantId!`, leaderboardData);
     }
-    console.log('[Leaderboard Update] Data to save:', leaderboardData);
-    console.log(`[Leaderboard Update] Attempting to setDoc for average entry: ${safeNickname}`, leaderboardData); // Лог перед записью
+    console.log('[LB Update] Data to save:', leaderboardData);
+    console.log(`[LB Update] Attempting AVERAGE setDoc for ${safeNickname}`, leaderboardData); // Лог перед записью
     try {
       // Используем setDoc вместо updateDoc для гарантированного создания или обновления
       await setDoc(leaderboardRef, leaderboardData);
-      console.log(`[Leaderboard Update] Successfully setDoc for average entry: ${safeNickname}`);
+      console.log(`[LB Update] Successfully setDoc AVERAGE for ${safeNickname}`);
 
       // Проверяем, что запись действительно обновилась
       const verifyDoc = await getDoc(leaderboardRef);
       if (verifyDoc.exists()) {
-        console.log(`[Leaderboard Update] Verification successful, entry updated with data:`, verifyDoc.data());
+        console.log(`[LB Update] Verification successful, entry updated with data:`, verifyDoc.data());
       } else {
         // Эта ситуация очень маловероятна после успешного setDoc, но добавим лог
-        console.error(`[Leaderboard Update] Verification failed! setDoc succeeded but entry not found after update for ${safeNickname}`);
+        console.error(`[LB Update] Verification failed! setDoc succeeded but entry not found after update for ${safeNickname}`);
       }
     } catch (error) {
-      console.error(`[Leaderboard Update] !!! CRITICAL ERROR setting average leaderboard entry for ${safeNickname}:`, error);
+      console.error(`[LB Update] !!! CRITICAL ERROR setting average leaderboard entry for ${safeNickname}:`, error);
       // Дополнительно логируем данные, которые пытались записать
-      console.error(`[Leaderboard Update] Data that failed to write:`, leaderboardData);
+      console.error(`[LB Update] Data that failed to write:`, leaderboardData);
     }
 
     // 9. Возвращаем РЕЙТИНГ ТЕКУЩЕЙ СЕССИИ (для отображения на CompletionScreen)
-    console.log(`[Leaderboard Update] Calculating rating for CURRENT session: trials=${totalTrials}, correct=${correctTrials}, time=${totalTimeMs}, rounds=${completedRounds}`);
-    const currentSessionRating = await calculateRating(
+    console.log(`[LB Update] Calculating rating for CURRENT session: trials=${totalTrials}, correct=${correctTrials}, time=${totalTimeMs}, rounds=${completedRounds}`);
+    currentSessionRating = await calculateRating(
         totalTrials, correctTrials, totalTimeMs, completedRounds
         // Тут мы не передаем детальную статистику по словам, т.к. она относится ко ВСЕМ сессиям
         // calculateRating сможет обработать это и посчитать общую точность
     );
-    console.log(`[Leaderboard Update] Calculated CURRENT session rating:`, currentSessionRating);
+    console.log(`[LB Update] Calculated CURRENT session rating:`, currentSessionRating);
 
     return currentSessionRating;
   } catch (error) {
-    console.error('[Leaderboard Update] Error:', error);
-    // В случае сбоя, пытаемся добавить хотя бы базовую запись в лидерборд для диагностики
+    console.error(`[LB Update ERROR] Error in main try block for ${safeNickname}:`, error);
+    // Попытка записать отладочную запись
     try {
-      const debugRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, 1);
-      const debugEntry = {
-        nickname, // Сохраняем оригинальный никнейм
-        participantId,
-        score: debugRating.finalScore,
-        accuracy: debugRating.accuracy,
-        totalTimeMs: totalTimeMs,
-        roundsCompleted: 1,
-        deviceType: deviceType,
-        ratingDetails: debugRating,
-        isErrorEntry: true,
-        lastUpdated: serverTimestamp()
-      };
-      
-      // Используем временный ID для отладочной записи, чтобы избежать конфликтов
-      const debugNickname = `debug-${safeNickname}`;
-      const debugRef = doc(db, 'leaderboard', debugNickname); // Используем отдельную ссылку
-      console.log(`[Leaderboard Update] Attempting to setDoc for fallback debug entry: ${debugNickname}`, debugEntry); // Лог перед записью
-      try { // Отдельный try-catch для записи отладочной записи
-        await setDoc(debugRef, debugEntry);
-        console.log('[Leaderboard Update] Successfully setDoc for fallback debug entry');
-      } catch (debugError) {
-         console.error(`[Leaderboard Update] !!! CRITICAL ERROR setting fallback debug entry for ${debugNickname}:`, debugError);
-         console.error(`[Leaderboard Update] Debug data that failed to write:`, debugEntry);
-      }
-      return debugRating;
+        // --- Лог №11: Перед расчетом отладочного рейтинга ---
+        console.log(`[LB Update ERROR] Calculating fallback debug rating.`);
+        const debugRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, 1);
+        console.log(`[LB Update ERROR] Fallback debug rating calculated.`);
+        const debugEntry = {
+          nickname,
+          participantId,
+          score: debugRating.finalScore,
+          accuracy: debugRating.accuracy,
+          totalTimeMs: totalTimeMs,
+          roundsCompleted: 1,
+          deviceType: deviceType,
+          ratingDetails: debugRating,
+          isErrorEntry: true,
+          lastUpdated: serverTimestamp()
+        };
+        const debugNickname = `debug-${safeNickname}`;
+        const debugRef = doc(db, 'leaderboard', debugNickname);
+        // --- Лог №12: Перед записью отладочной записи ---
+        console.log(`[LB Update ERROR] Attempting to setDoc for fallback debug entry: ${debugNickname}`, debugEntry);
+        try {
+            await setDoc(debugRef, debugEntry);
+            console.log('[LB Update ERROR] Successfully setDoc for fallback debug entry');
+        } catch (debugError) {
+            console.error(`[LB Update ERROR] !!! CRITICAL ERROR setting fallback debug entry for ${debugNickname}:`, debugError);
+            console.error(`[LB Update ERROR] Debug data that failed to write:`, debugEntry);
+        }
+        return debugRating;
     } catch (fallbackError) {
-      console.error('[Leaderboard Update] Error creating fallback debug rating calculation:', fallbackError);
-      throw error; // Перебрасываем оригинальную ошибку основного блока
+        console.error('[LB Update FATAL] Error creating fallback debug rating calculation:', fallbackError);
+        throw error; // Перебрасываем оригинальную ошибку основного блока
     }
   }
 };
