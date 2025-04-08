@@ -1043,32 +1043,77 @@ export const resetLeaderboardRounds = async () => {
         continue;
       }
 
-      // Получаем сессии для точного подсчета раундов
+      // 1. Получаем данные из progress (считается наиболее достоверным источником)
+      const progressDoc = await getDoc(doc(db, 'progress', participantId));
+      let progressRounds = 0;
+      if (progressDoc.exists()) {
+        const progressData = progressDoc.data();
+        progressRounds = progressData.totalSessions || 0;
+        console.log(`[Reset Rounds] Progress rounds for ${participantId}: ${progressRounds}`);
+      } else {
+        console.log(`[Reset Rounds] No progress document found for ${participantId}`);
+      }
+
+      // 2. Получаем сессии для точного подсчета (запасной вариант)
       const sessionsQuery = query(
         collection(db, 'sessions'),
         where('participantId', '==', participantId)
       );
       const sessionsSnapshot = await getDocs(sessionsQuery);
       const sessionCount = sessionsSnapshot.size;
+      console.log(`[Reset Rounds] Session count for ${participantId}: ${sessionCount}`);
       
-      // Правильное количество раундов = количество сессий
-      // Если у пользователя нет сессий, ставим 1 раунд
-      const correctRounds = Math.max(1, sessionCount);
+      // АЛГОРИТМ ВЫБОРА ПРАВИЛЬНОГО ЗНАЧЕНИЯ:
+      // 1. Если в progress есть totalSessions, используем его
+      // 2. Если totalSessions не найден или равен 0, используем количество сессий
+      // 3. Если сессий нет, устанавливаем 1 (минимальное значение)
       
-      console.log(`[Reset Rounds] User ${doc.id}: Sessions=${sessionCount}, Old rounds=${data.roundsCompleted || 0}, New rounds=${correctRounds}`);
+      const correctRounds = progressRounds > 0 ? progressRounds : Math.max(1, sessionCount);
       
-      // Если количество раундов отличается, обновляем
-      if (data.roundsCompleted !== correctRounds) {
-        // Обновляем основное поле roundsCompleted
-        batch.update(doc.ref, { roundsCompleted: correctRounds });
-        
-        // Если есть ratingDetails, обновляем и там
-        if (data.ratingDetails) {
-          batch.update(doc.ref, { 'ratingDetails.roundsCompleted': correctRounds });
-        }
-        
-        updatedCount++;
+      console.log(`[Reset Rounds] User ${doc.id}: Progress=${progressRounds}, Sessions=${sessionCount}, Old rounds=${data.roundsCompleted || 0}, Final rounds=${correctRounds}`);
+      
+      // Только для диагностики
+      if (correctRounds !== data.roundsCompleted) {
+        console.log(`[Reset Rounds] UPDATING rounds for ${doc.id} from ${data.roundsCompleted} to ${correctRounds}`);
       }
+      
+      // Принудительно обновляем запись, даже если данные не изменились
+      // (чтобы убедиться, что обновление работает)
+      
+      // Обновляем основное поле roundsCompleted
+      batch.update(doc.ref, { roundsCompleted: correctRounds });
+      
+      // Если есть ratingDetails, обновляем и там
+      if (data.ratingDetails) {
+        batch.update(doc.ref, { 'ratingDetails.roundsCompleted': correctRounds });
+      }
+      
+      // Также обновляем поля score и bonusPercentage для согласованности
+      if (data.ratingDetails) {
+        // Получаем базовый рейтинг без бонуса
+        const baseScore = data.ratingDetails.rating || 0;
+        
+        // Рассчитываем новый бонус на основе correctRounds
+        const bonusPercent = (correctRounds - 1) * 5; // +5% за каждый раунд после первого
+        const cappedBonusPercent = Math.min(bonusPercent, 25 * 5); // максимум 125%
+        const totalBonusPercent = 100 + cappedBonusPercent;
+        const bonusMultiplier = totalBonusPercent / 100;
+        
+        // Рассчитываем новый итоговый счет
+        const newFinalScore = Math.round(baseScore * bonusMultiplier);
+        
+        // Обновляем все связанные поля
+        batch.update(doc.ref, { 
+          score: newFinalScore,
+          'ratingDetails.bonusPercentage': totalBonusPercent,
+          'ratingDetails.roundBonus': bonusMultiplier,
+          'ratingDetails.finalScore': newFinalScore
+        });
+        
+        console.log(`[Reset Rounds] Also updating score for ${doc.id}: baseScore=${baseScore}, bonus=${cappedBonusPercent}%, newScore=${newFinalScore}`);
+      }
+      
+      updatedCount++;
     }
     
     // Применяем все обновления одним батчем
