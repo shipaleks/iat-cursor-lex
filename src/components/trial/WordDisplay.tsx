@@ -22,7 +22,7 @@ export const WordDisplay: React.FC<WordDisplayProps> = ({ word, color = 'default
       }}
     >
       <Typography
-        variant={isMobile ? "h3" : "h2"}
+        variant={isMobile ? "h4" : "h3"}
         component="div"
         align="center"
         sx={{
