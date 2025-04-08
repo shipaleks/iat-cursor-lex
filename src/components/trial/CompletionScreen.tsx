@@ -306,7 +306,7 @@ export const CompletionScreen: React.FC<CompletionScreenProps> = ({ participant,
           </Box>
 
           <Leaderboard 
-            currentUserNickname={participant.nickname} 
+            currentUserNickname={participant.nickname.toLowerCase()} 
             sx={{
               '.current-user': {
                 bgcolor: 'primary.light',

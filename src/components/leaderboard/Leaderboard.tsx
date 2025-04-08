@@ -91,7 +91,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
           setError(null);
           
           if (currentUserNickname) {
-            const currentUser = sortedData.find(entry => entry.nickname === currentUserNickname);
+            // Ищем пользователя по отображаемому никнейму (не по ID документа)
+            // Это важно, так как ID документа может быть нормализованной версией
+            const currentUser = sortedData.find(
+              entry => entry.nickname.toLowerCase() === currentUserNickname.toLowerCase()
+            );
+            
             if (currentUser) {
               console.log('[Leaderboard] Current user data:', { 
                 nickname: currentUser.nickname,
@@ -100,7 +105,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
                 rounds: currentUser.roundsCompleted || 0
               });
             } else {
-              console.log('[Leaderboard] Current user not found in leaderboard');
+              console.log('[Leaderboard] Current user not found in leaderboard. Looking for:', currentUserNickname);
+              console.log('[Leaderboard] Available nicknames:', sortedData.map(e => e.nickname));
             }
           }
         }

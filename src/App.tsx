@@ -268,14 +268,19 @@ const App = () => {
         // Обновляем leaderboard ПОСЛЕ обновления прогресса
         // Передаем nickname, participantId, stats и deviceType
         console.log(`[App] Updating leaderboard for ${participant.nickname} with stats:`, stats);
+        
+        // Приводим никнейм к нижнему регистру для согласованности
+        const normalizedNickname = participant.nickname.toLowerCase();
+        console.log(`[App] Using normalized nickname for leaderboard: '${normalizedNickname}'`);
+        
         const ratingData = await updateLeaderboard(
-          participant.nickname, 
+          normalizedNickname, 
           user.uid, 
           stats.correct,
           stats.total,
           stats.totalTimeMs,
           device
-        ); 
+        );
         setLeaderboardRating(ratingData);
         console.log("[App] Leaderboard rating updated after progress save:", ratingData);
         

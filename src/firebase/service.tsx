@@ -315,6 +315,13 @@ export const updateLeaderboard = async (
   deviceType: 'mobile' | 'desktop'
 ): Promise<RatingCalculation> => {
   console.log(`[Leaderboard Update] Starting for ${nickname} (${participantId})`);
+  
+  // Проверяем и нормализуем никнейм для безопасного использования в качестве ID документа
+  const safeNickname = nickname.replace(/[^a-zA-Z0-9-_]/g, '_').toLowerCase();
+  if (safeNickname !== nickname) {
+    console.log(`[Leaderboard Update] Normalized nickname from '${nickname}' to safe ID '${safeNickname}'`);
+  }
+  
   try {
     // 1. Сначала получаем текущий прогресс для точного подсчета раундов
     const existingProgress = await getParticipantProgress(participantId);
@@ -338,19 +345,19 @@ export const updateLeaderboard = async (
     console.log(`[Leaderboard Update] Final rounds calculation: max(${currentRounds}, ${sessionsData.length + 1}) = ${completedRounds}`);
 
     // Проверяем, существует ли уже запись в лидерборде
-    const existingLeaderboardDoc = await getDoc(doc(db, 'leaderboard', nickname));
+    const existingLeaderboardDoc = await getDoc(doc(db, 'leaderboard', safeNickname));
     console.log(`[Leaderboard Update] Existing leaderboard entry exists: ${existingLeaderboardDoc.exists()}`);
     
     if (sessionsData.length === 0) {
-      console.warn(`[Leaderboard Update] No sessions found for ${nickname}, calculating for current session only.`);
+      console.warn(`[Leaderboard Update] No sessions found for ${safeNickname}, calculating for current session only.`);
       // Вычисляем рейтинг для текущей сессии и записываем в лидерборд
       const currentSessionRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, completedRounds);
       console.log(`[Leaderboard Update] Rating for current session only:`, currentSessionRating);
       
       // Важно! Создаем запись в лидерборде даже если это первый раунд
-      const leaderboardRef = doc(db, 'leaderboard', nickname);
+      const leaderboardRef = doc(db, 'leaderboard', safeNickname);
       const leaderboardEntry = {
-        nickname, 
+        nickname, // Сохраняем оригинальный никнейм для отображения
         participantId, 
         score: currentSessionRating.finalScore, 
         accuracy: currentSessionRating.accuracy,
@@ -366,7 +373,7 @@ export const updateLeaderboard = async (
       try {
         // Используем setDoc вместо updateDoc для гарантированного создания или обновления
         await setDoc(leaderboardRef, leaderboardEntry);
-        console.log(`[Leaderboard Update] Created/updated initial leaderboard entry for ${nickname} with ${completedRounds} rounds`);
+        console.log(`[Leaderboard Update] Created/updated initial leaderboard entry for ${safeNickname} with ${completedRounds} rounds`);
         
         // Проверяем, что запись действительно создалась
         const verifyDoc = await getDoc(leaderboardRef);
@@ -422,9 +429,9 @@ export const updateLeaderboard = async (
     console.log(`[Leaderboard Update] Using device type: ${latestDeviceType}`);
 
     // 8. Обновляем запись в таблице лидеров СРЕДНИМ рейтингом
-    const leaderboardRef = doc(db, 'leaderboard', nickname);
+    const leaderboardRef = doc(db, 'leaderboard', safeNickname);
     const leaderboardData = {
-      nickname,
+      nickname, // Сохраняем оригинальный никнейм для отображения
       participantId,
       accuracy: averageRating.accuracy, // Средняя точность (в %)
       totalTimeMs: averageTimeMs, // Среднее время на сессию
@@ -448,7 +455,7 @@ export const updateLeaderboard = async (
     try {
       // Используем setDoc вместо updateDoc для гарантированного создания или обновления
       await setDoc(leaderboardRef, leaderboardData);
-      console.log(`[Leaderboard Update] Leaderboard document for ${nickname} updated successfully with ${completedRounds} rounds`);
+      console.log(`[Leaderboard Update] Leaderboard document for ${safeNickname} updated successfully with ${completedRounds} rounds`);
       
       // Проверяем, что запись действительно обновилась
       const verifyDoc = await getDoc(leaderboardRef);
@@ -477,7 +484,7 @@ export const updateLeaderboard = async (
     try {
       const debugRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, 1);
       const debugEntry = {
-        nickname,
+        nickname, // Сохраняем оригинальный никнейм
         participantId,
         score: debugRating.finalScore,
         accuracy: debugRating.accuracy,
@@ -488,7 +495,10 @@ export const updateLeaderboard = async (
         isErrorEntry: true,
         lastUpdated: serverTimestamp()
       };
-      await setDoc(doc(db, 'leaderboard', `debug-${nickname}`), debugEntry);
+      
+      // Используем временный ID для отладочной записи, чтобы избежать конфликтов
+      const debugNickname = `debug-${safeNickname}`;
+      await setDoc(doc(db, 'leaderboard', debugNickname), debugEntry);
       console.log('[Leaderboard Update] Created fallback debug entry due to error');
       return debugRating;
     } catch (fallbackError) {
@@ -545,6 +555,12 @@ export const getLeaderboard = async (): Promise<LeaderboardEntryType[]> => {
       const data = doc.data();
       console.log('[Leaderboard] Document data:', data);
       
+      // Пропускаем диагностические записи и записи отладки
+      if (doc.id === '_debug_entry_' || doc.id.startsWith('debug-') || data.isErrorEntry) {
+        console.log(`[Leaderboard] Skipping diagnostic/debug entry: ${doc.id}`);
+        return; // Пропускаем эту итерацию
+      }
+      
       // Собираем объект LeaderboardEntryType, беря данные из сохраненного документа
       const entry: LeaderboardEntryType = {
         nickname: data.nickname,
@@ -568,6 +584,15 @@ export const getLeaderboard = async (): Promise<LeaderboardEntryType[]> => {
     
     // Дополнительная проверка на пустой массив
     if (entries.length === 0) {
+      // Проверяем, есть ли в коллекции хоть какие-то документы (кроме диагностических)
+      const realEntriesExist = leaderboardSnapshot.docs.some(doc => 
+        doc.id !== '_debug_entry_' && !doc.id.startsWith('debug-') && !doc.data().isErrorEntry
+      );
+      
+      if (realEntriesExist) {
+        console.warn('[Leaderboard] Real entries exist but failed to parse them');
+      }
+      
       console.warn('[Leaderboard] No valid entries found after processing, adding fallback entry');
       // Добавляем заглушку, чтобы пользователь видел, что лидерборд работает
       entries.push({
