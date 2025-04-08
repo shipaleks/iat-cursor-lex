@@ -11,7 +11,8 @@ import {
   Paper,
   IconButton,
   Collapse,
-  SxProps
+  SxProps,
+  Button
 } from '@mui/material';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -40,6 +41,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [loadAttempts, setLoadAttempts] = useState(0); // Счетчик попыток загрузки
 
   // Автоматическое обновление каждые 5 секунд
   useEffect(() => {
@@ -54,44 +56,80 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
     const loadLeaderboard = async () => {
       setLoading(true);
       try {
-        console.log('[Leaderboard] Loading leaderboard data...');
+        console.log('[Leaderboard] Loading leaderboard data... (attempt #' + (loadAttempts + 1) + ')');
         const data = await getLeaderboard();
         
-        // Сортируем по убыванию рейтинга и добавляем ранг
-        const sortedData = data
-          .sort((a, b) => b.score - a.score)
-          .map((entry, index) => ({
-            ...entry,
-            rank: index + 1
-          }));
-        setLeaderboard(sortedData);
-        console.log('[Leaderboard] Loaded', sortedData.length, 'entries');
+        // Увеличиваем счетчик попыток
+        setLoadAttempts(prev => prev + 1);
         
-        if (currentUserNickname) {
-          const currentUser = sortedData.find(entry => entry.nickname === currentUserNickname);
-          if (currentUser) {
-            console.log('[Leaderboard] Current user data:', { 
-              nickname: currentUser.nickname,
-              rank: currentUser.rank,
-              score: currentUser.score,
-              rounds: currentUser.roundsCompleted || 0
-            });
+        if (!data || data.length === 0) {
+          console.warn('[Leaderboard] Received empty data array');
+          // Если данных нет после нескольких попыток, добавляем заглушку
+          if (loadAttempts >= 2) {
+            setLeaderboard([{
+              nickname: 'Данные загружаются...',
+              score: 0,
+              rank: 1,
+              totalTimeMs: 0,
+              deviceType: 'desktop',
+              roundsCompleted: 0
+            }]);
+            setError('Данные лидерборда загружаются. Сначала завершите один раунд.');
           } else {
-            console.log('[Leaderboard] Current user not found in leaderboard');
+            setError('Загрузка данных...');
+          }
+        } else {
+          // Сортируем по убыванию рейтинга и добавляем ранг
+          const sortedData = data
+            .sort((a, b) => b.score - a.score)
+            .map((entry, index) => ({
+              ...entry,
+              rank: index + 1
+            }));
+          setLeaderboard(sortedData);
+          console.log('[Leaderboard] Loaded', sortedData.length, 'entries');
+          setError(null);
+          
+          if (currentUserNickname) {
+            const currentUser = sortedData.find(entry => entry.nickname === currentUserNickname);
+            if (currentUser) {
+              console.log('[Leaderboard] Current user data:', { 
+                nickname: currentUser.nickname,
+                rank: currentUser.rank,
+                score: currentUser.score,
+                rounds: currentUser.roundsCompleted || 0
+              });
+            } else {
+              console.log('[Leaderboard] Current user not found in leaderboard');
+            }
           }
         }
       } catch (err) {
-        setError('Не удалось загрузить таблицу лидеров');
         console.error('Error loading leaderboard:', err);
+        // Если ошибка повторяется, добавляем более информативное сообщение
+        if (loadAttempts > 1) {
+          setError('Не удалось загрузить таблицу лидеров. Пожалуйста, завершите один раунд, чтобы увидеть свои результаты.');
+          // Добавляем заглушку после нескольких неудачных попыток
+          setLeaderboard([{
+            nickname: 'Недоступно',
+            score: 0,
+            rank: 1,
+            totalTimeMs: 0,
+            deviceType: 'desktop',
+            roundsCompleted: 0
+          }]);
+        } else {
+          setError('Не удалось загрузить таблицу лидеров');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     loadLeaderboard();
-  }, [currentUserNickname, lastUpdate]); // Перезагружаем при изменении никнейма или lastUpdate
+  }, [currentUserNickname, lastUpdate, loadAttempts]); // Перезагружаем при изменении никнейма или lastUpdate
 
-  if (loading) {
+  if (loading && loadAttempts <= 1) {
     return (
       <Box display="flex" justifyContent="center" p={3}>
         <Typography>Загрузка результатов...</Typography>
@@ -99,10 +137,29 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
     );
   }
 
-  if (error) {
+  if (error && leaderboard.length === 0) {
     return (
-      <Box display="flex" justifyContent="center" p={3}>
-        <Typography color="error">{error}</Typography>
+      <Box display="flex" flexDirection="column" alignItems="center" p={3}>
+        <Typography color="error" gutterBottom>{error}</Typography>
+        <Button 
+          variant="outlined" 
+          size="small" 
+          onClick={() => setLastUpdate(Date.now())}
+          sx={{ mt: 1 }}
+        >
+          Обновить
+        </Button>
+      </Box>
+    );
+  }
+
+  // Если и после загрузки нет данных, показываем сообщение
+  if (leaderboard.length === 0) {
+    return (
+      <Box display="flex" flexDirection="column" alignItems="center" p={3}>
+        <Typography color="text.secondary">
+          Пока нет данных в таблице лидеров. Завершите один раунд, чтобы увидеть свои результаты.
+        </Typography>
       </Box>
     );
   }
@@ -125,6 +182,14 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
       <Typography variant="h5" gutterBottom align="center">
         Лидерборд
       </Typography>
+
+      {error && (
+        <Box sx={{ mb: 2, p: 1, bgcolor: 'warning.light', borderRadius: 1 }}>
+          <Typography variant="body2" align="center" color="warning.contrastText">
+            {error}
+          </Typography>
+        </Box>
+      )}
 
       {currentUser && !isCurrentUserInTop5 && !showAll && (
         <Box sx={{ mb: 2, p: 2, bgcolor: 'primary.main', borderRadius: 1 }}>
@@ -194,6 +259,18 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({ currentUserNickname, s
           </IconButton>
         </Box>
       )}
+
+      {/* Добавляем возможность принудительного обновления */}
+      <Box display="flex" justifyContent="center" mt={2}>
+        <Button 
+          variant="text" 
+          size="small" 
+          onClick={() => setLastUpdate(Date.now())}
+          sx={{ fontSize: '0.75rem' }}
+        >
+          Обновить результаты
+        </Button>
+      </Box>
     </Box>
   );
 };
