@@ -14,7 +14,7 @@ import { signInAnonymousUser, getParticipantProgress, getParticipantProgressByNi
 import { auth } from './firebase/config.tsx';
 import { User } from 'firebase/auth';
 import { IMAGES } from './utils/trialGenerator';
-import { doc, setDoc, serverTimestamp, getDocs, writeBatch, collection } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDocs, writeBatch, collection, updateDoc } from 'firebase/firestore';
 import { db } from './firebase/config.tsx';
 import { ExperimentExplanation } from './components/trial/ExperimentExplanation';
 import { TrialResult } from './types';
@@ -240,8 +240,30 @@ const App = () => {
         );
         console.log('[App] Session results saved to Firestore');
         
+        // Получаем текущее количество сессий до обновления прогресса
+        const progressBeforeUpdate = await getParticipantProgress(user.uid);
+        const sessionsBeforeUpdate = progressBeforeUpdate?.totalSessions || 0;
+        console.log(`[App] Current totalSessions before update: ${sessionsBeforeUpdate}`);
+        
         // Передаем participantId, nickname и trialsData
         await updateParticipantProgress(user.uid, participant.nickname, trialsData);
+        
+        // Проверяем, что totalSessions обновились после updateParticipantProgress
+        const progressAfterUpdate = await getParticipantProgress(user.uid);
+        const sessionsAfterUpdate = progressAfterUpdate?.totalSessions || 0;
+        console.log(`[App] Updated totalSessions after progress update: ${sessionsAfterUpdate}`);
+        
+        // Если по какой-то причине количество сессий не увеличилось, принудительно увеличиваем его
+        if (sessionsAfterUpdate <= sessionsBeforeUpdate) {
+          console.warn(`[App] totalSessions did not increase, forcing update (${sessionsBeforeUpdate} -> ${sessionsBeforeUpdate + 1})`);
+          
+          // Принудительно обновляем количество сессий
+          const progressRef = doc(db, 'progress', user.uid);
+          await updateDoc(progressRef, {
+            totalSessions: sessionsBeforeUpdate + 1,
+            lastSessionTimestamp: serverTimestamp()
+          });
+        }
         
         // Обновляем leaderboard ПОСЛЕ обновления прогресса
         // Передаем nickname, participantId, stats и deviceType

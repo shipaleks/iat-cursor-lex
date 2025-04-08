@@ -361,7 +361,14 @@ export const updateLeaderboard = async (
 
     // 3. Получаем ПРОГРЕСС участника для определения количества раундов
     const existingProgress = await getParticipantProgress(participantId);
-    const completedRounds = Math.max(1, existingProgress?.totalSessions || 0);
+    let completedRounds = Math.max(1, existingProgress?.totalSessions || 0);
+    
+    // Проверяем, что completedRounds соответствует количеству сессий
+    if (completedRounds < sessionsData.length + 1) {
+      completedRounds = sessionsData.length + 1;
+      console.warn(`[Leaderboard Update] Detected inconsistency - totalSessions (${existingProgress?.totalSessions}) is less than actual sessions count (${sessionsData.length + 1}). Using the higher value: ${completedRounds}`);
+    }
+    
     console.log(`[Leaderboard Update] Rounds completed from progress: ${completedRounds}`);
     
     // --- Получаем детальную статистику по словам для calculateRating --- 
