@@ -11,7 +11,7 @@ import { auth } from '../../firebase/config.tsx';
 import { getParticipantProgress, getParticipantProgressByNickname } from '../../firebase/service.tsx';
 import { getDeviceType } from '../../utils/deviceUtils';
 
-const IMAGE_DISPLAY_TIME = 1000; // ms
+const IMAGE_DISPLAY_TIME = 1500; // ms
 
 // Глобальная переменная для хранения временной метки начала измерения с максимальной точностью
 // Избегаем использования React state для минимизации задержек

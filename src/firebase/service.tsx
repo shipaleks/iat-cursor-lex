@@ -629,13 +629,13 @@ export const calculateRating = async (
 
   // 2. Расчет времени
   const averageTimePerWord = totalTimeMs / totalTrials;
-  const theoreticalMinTimePerWord = 1500; // 1.5 секунды
+  const theoreticalMinTimePerWord = 1600; // 1.5 секунды + 100мс погрешность на нажатие
   const theoreticalMinTime = theoreticalMinTimePerWord * totalTrials;
   let timeScore = 0;
   if (averageTimePerWord <= theoreticalMinTimePerWord) {
     timeScore = 15; // Макс баллы, если время <= оптимального
   } else {
-    // Шкала убывания от 15 до 0 баллов при увеличении времени от 1.5с до 4с
+    // Шкала убывания от 15 до 0 баллов при увеличении времени от 1.6с до 4с
     const maxTimeThreshold = 4000; 
     if (averageTimePerWord < maxTimeThreshold) {
       const timeDiff = averageTimePerWord - theoreticalMinTimePerWord;
