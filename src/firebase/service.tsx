@@ -74,14 +74,14 @@ export const getParticipantProgressByNickname = async (nickname: string, forceNe
       // Check for existing nickname (используем нормализованный никнейм)
       const nicknameDoc = await getDoc(doc(db, 'nicknames', normalizedNickname));
     
-      if (nicknameDoc.exists()) {
+    if (nicknameDoc.exists()) {
         // Found existing nickname mapping
-        const userId = nicknameDoc.data().userId;
+      const userId = nicknameDoc.data().userId;
         console.log('Found existing user ID in nicknames:', userId);
       
         // Get progress by userId
-        const progressDoc = await getDoc(doc(db, 'progress', userId));
-        if (progressDoc.exists()) {
+      const progressDoc = await getDoc(doc(db, 'progress', userId));
+      if (progressDoc.exists()) {
           const progress = progressDoc.data() as ParticipantProgressType;
           console.log('Loaded existing progress for nickname', normalizedNickname, 'with', progress.completedImages?.length || 0, 'completed images');
           
@@ -100,15 +100,15 @@ export const getParticipantProgressByNickname = async (nickname: string, forceNe
             progress.userId = userId;
           }
           
-          return {
-            userId,
-            progress: {
-              ...progress,
+        return {
+          userId,
+          progress: {
+            ...progress,
               userId: progress.userId || userId,
-              completedImages: Array.isArray(progress.completedImages) ? progress.completedImages : []
-            }
-          };
-        } else {
+            completedImages: Array.isArray(progress.completedImages) ? progress.completedImages : []
+          }
+        };
+      } else {
           console.warn('Found nickname mapping but no progress document for userId', userId);
         }
       } else {
@@ -249,6 +249,9 @@ export const updateParticipantProgress = async (
 
     // Обновляем глобальную статистику изображений
     await updateGlobalImageStats(completedImagesInSession);
+    
+    // Обновляем глобальную статистику слов
+    await updateGlobalWordStats(trialsData);
 
     console.log(`[Progress Update] Progress update successful for ${participantNickname}.`);
   } catch (error) {
@@ -400,7 +403,7 @@ export const updateLeaderboard = async (
         score: currentSessionRating.finalScore,
         accuracy: currentSessionRating.accuracy,
         totalTimeMs: totalTimeMs,
-        roundsCompleted: completedRounds,
+      roundsCompleted: completedRounds,
         deviceType: deviceType,
         ratingDetails: currentSessionRating,
         lastUpdated: serverTimestamp(),
@@ -509,7 +512,7 @@ export const updateLeaderboard = async (
         // Эта ситуация очень маловероятна после успешного setDoc, но добавим лог
         console.error(`[LB Update] Verification failed! setDoc succeeded but entry not found after update for ${safeNickname}`);
       }
-    } catch (error) {
+  } catch (error) {
       console.error(`[LB Update] !!! CRITICAL ERROR setting average leaderboard entry for ${safeNickname}:`, error);
       // Дополнительно логируем данные, которые пытались записать
       console.error(`[LB Update] Data that failed to write:`, leaderboardData);
@@ -1032,6 +1035,65 @@ export const updateGlobalImageStats = async (imageFileNames: string[]): Promise<
   } catch (error) {
     console.error('Error updating global image stats:', error);
     throw error;
+  }
+};
+
+// Функция для обновления глобальной статистики использования слов
+export const updateGlobalWordStats = async (trialsData: TrialResult[]): Promise<void> => {
+  try {
+    // Фильтруем только реальные слова (тип aesthetic)
+    const realWords = trialsData
+      .filter(trial => trial.wordType === 'aesthetic')
+      .map(trial => trial.word);
+    
+    if (realWords.length === 0) {
+      console.log('[Word Stats] No real words to update');
+      return;
+    }
+    
+    const statsRef = doc(db, 'wordStats', 'global');
+    
+    // Используем транзакцию для атомарного обновления
+    await runTransaction(db, async (transaction) => {
+      const statsDoc = await transaction.get(statsRef);
+      
+      // Получаем текущие счетчики или создаем новые
+      const wordStats: { [word: string]: { word: string, totalShownCount: number } } = {};
+      
+      if (statsDoc.exists()) {
+        const data = statsDoc.data();
+        // Копируем существующие данные
+        Object.keys(data).forEach(key => {
+          if (key !== 'lastUpdated' && key !== 'createdAt') {
+            wordStats[key] = data[key];
+          }
+        });
+      }
+      
+      // Обновляем счетчики для каждого слова
+      realWords.forEach(word => {
+        if (!wordStats[word]) {
+          wordStats[word] = { word, totalShownCount: 0 };
+        }
+        wordStats[word].totalShownCount++;
+      });
+      
+      // Подготавливаем данные для записи
+      const updates: any = { ...wordStats };
+      updates.lastUpdated = serverTimestamp();
+      
+      // Если документ существует, обновляем его, иначе создаем новый
+      if (statsDoc.exists()) {
+        transaction.update(statsRef, updates);
+      } else {
+        updates.createdAt = serverTimestamp();
+        transaction.set(statsRef, updates);
+      }
+    });
+    
+    console.log(`[Word Stats] Updated global word stats for ${realWords.length} words`);
+  } catch (error) {
+    console.error('[Word Stats] Error updating global word stats:', error);
   }
 };
 

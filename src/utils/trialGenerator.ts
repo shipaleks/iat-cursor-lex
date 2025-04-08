@@ -3,7 +3,7 @@ import { shuffle } from './arrayUtils';
 // Импортируем новый банк слов
 import { AESTHETIC_WORDS } from './wordBank';
 // Добавляем импорты Firestore
-import { getDocs, collection } from 'firebase/firestore';
+import { getDocs, collection, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase/config'; // Убедимся, что путь правильный
 import { getGlobalImageStats } from '../firebase/service'; // Импортируем функцию получения глобальной статистики
 
@@ -1945,8 +1945,8 @@ function createTrialsForImage(image: ImageData): Trial[] {
 
   // 3. Создание испытаний
   selectedRealWords.forEach(realWord => {
-    trials.push({
-      imageId: image.id,
+  trials.push({
+    imageId: image.id,
       imageFileName: image.fileName,
       word: realWord.word,
       wordType: 'aesthetic'
@@ -1954,8 +1954,8 @@ function createTrialsForImage(image: ImageData): Trial[] {
   });
 
   nonWords.forEach(nonWord => {
-      trials.push({
-        imageId: image.id,
+  trials.push({
+    imageId: image.id,
       imageFileName: image.fileName,
         word: nonWord,
         wordType: 'non-word'
@@ -2014,16 +2014,26 @@ export async function loadWordStats(): Promise<{ [word: string]: number }> {
   }
   try {
     console.log('Loading global word stats...');
-    const statsSnapshot = await getDocs(collection(db, 'wordStats'));
+    const statsDoc = await getDoc(doc(db, 'wordStats', 'global'));
     const stats: { [word: string]: number } = {};
-    statsSnapshot.forEach(doc => {
-      const data = doc.data();
-      if (data.word && typeof data.totalShownCount === 'number') {
-        stats[data.word] = data.totalShownCount;
-      } else {
-         console.warn('Skipping invalid wordStat document:', doc.id, data);
-      }
-    });
+    
+    if (statsDoc.exists()) {
+      const data = statsDoc.data();
+      // Обрабатываем данные в новом формате (как объекты с полем totalShownCount)
+      Object.keys(data).forEach(key => {
+        if (key !== 'lastUpdated' && key !== 'createdAt') {
+          if (typeof data[key] === 'object' && data[key].totalShownCount !== undefined) {
+            stats[key] = data[key].totalShownCount;
+          } else if (typeof data[key] === 'number') {
+            // Поддержка обратной совместимости со старым форматом
+            stats[key] = data[key];
+          }
+        }
+      });
+    } else {
+      console.log('Word stats document does not exist, will be created on first update.');
+    }
+    
     wordStatsCache = stats;
     console.log(`Loaded ${Object.keys(stats).length} word stats.`);
     return stats;
