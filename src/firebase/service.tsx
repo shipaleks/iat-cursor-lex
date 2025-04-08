@@ -323,19 +323,29 @@ export const updateLeaderboard = async (
     console.log(`[Leaderboard Update] Found ${sessionsData.length} previous sessions.`);
 
     if (sessionsData.length === 0) {
-      console.warn(`[Leaderboard Update] No sessions found for ${nickname}, cannot calculate average score.`);
-      // Возвращаем фиктивный рейтинг или бросаем ошибку?
-      // Пока вернем рейтинг текущей сессии, т.к. среднее посчитать не можем
-       const tempRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, 1); // Считаем для 1 раунда
-       console.log(`[Leaderboard Update] Returning rating for current session only:`, tempRating);
-       // Записываем хотя бы результат текущей сессии
-        const leaderboardRefOnError = doc(db, 'leaderboard', nickname);
-        await setDoc(leaderboardRefOnError, {
-          nickname, participantId, score: tempRating.finalScore, accuracy: tempRating.accuracy,
-          totalTimeMs: totalTimeMs, roundsCompleted: 1, deviceType: deviceType, 
-          ratingDetails: tempRating, lastUpdated: serverTimestamp()
-        }, { merge: true });
-       return tempRating; 
+      console.warn(`[Leaderboard Update] No sessions found for ${nickname}, calculating for current session only.`);
+      // Вычисляем рейтинг для текущей сессии и записываем в лидерборд
+      const currentSessionRating = await calculateRating(totalTrials, correctTrials, totalTimeMs, 1);
+      console.log(`[Leaderboard Update] Rating for current session only:`, currentSessionRating);
+      
+      // Важно! Создаем запись в лидерборде даже если это первый раунд
+      const leaderboardRef = doc(db, 'leaderboard', nickname);
+      await setDoc(leaderboardRef, {
+        nickname, 
+        participantId, 
+        score: currentSessionRating.finalScore, 
+        accuracy: currentSessionRating.accuracy,
+        totalTimeMs: totalTimeMs, 
+        roundsCompleted: 1, 
+        deviceType: deviceType, 
+        ratingDetails: currentSessionRating, 
+        lastUpdated: serverTimestamp(),
+        totalTrials: totalTrials,
+        correctTrials: correctTrials
+      });
+      console.log(`[Leaderboard Update] Created initial leaderboard entry for ${nickname}`);
+       
+      return currentSessionRating; 
     }
 
     // 2. Считаем СУММАРНЫЕ и СРЕДНИЕ значения по ВСЕМ сессиям

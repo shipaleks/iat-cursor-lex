@@ -18,7 +18,7 @@ import { doc, setDoc, serverTimestamp, getDocs, writeBatch, collection } from 'f
 import { db } from './firebase/config.tsx';
 import { ExperimentExplanation } from './components/trial/ExperimentExplanation';
 import { TrialResult } from './types';
-import { updateParticipantProgress, updateLeaderboard } from './firebase/service.tsx';
+import { updateParticipantProgress, updateLeaderboard, saveSessionResults } from './firebase/service.tsx';
 import { RatingCalculation } from './types';
 
 const theme = createTheme({
@@ -228,12 +228,24 @@ const App = () => {
     
     if (user && participant) {
       try {
+        // Сохраняем результаты сессии в Firestore
+        const device = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+        await saveSessionResults(
+          user.uid,
+          stats.total,
+          stats.correct,
+          stats.totalTimeMs,
+          participant.nickname,
+          device
+        );
+        console.log('[App] Session results saved to Firestore');
+        
         // Передаем participantId, nickname и trialsData
         await updateParticipantProgress(user.uid, participant.nickname, trialsData);
         
         // Обновляем leaderboard ПОСЛЕ обновления прогресса
         // Передаем nickname, participantId, stats и deviceType
-        const device = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+        console.log(`[App] Updating leaderboard for ${participant.nickname} with stats:`, stats);
         const ratingData = await updateLeaderboard(
           participant.nickname, 
           user.uid, 
@@ -242,7 +254,7 @@ const App = () => {
           stats.totalTimeMs,
           device
         ); 
-        setLeaderboardRating(ratingData); // Теперь типы совпадают
+        setLeaderboardRating(ratingData);
         console.log("[App] Leaderboard rating updated after progress save:", ratingData);
         
       } catch (error) {

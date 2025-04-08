@@ -156,29 +156,6 @@ export const ExperimentScreen: React.FC<ExperimentScreenProps> = ({ participant,
         )];
         console.log('Unique images completed in this session:', uniqueCompletedImagesInSession);
         console.log('Image filenames:', uniqueCompletedImagesInSession.join(', '));
-
-        // await saveSessionResults(
-        //   participant.userId,
-        //   session.trials.length,
-        //   finalCorrectAnswers,
-        //   totalTime,
-        //   participant.nickname,
-        //   getDeviceType()
-        // );
-
-        // --- УДАЛЯЕМ ЭТОТ ВЫЗОВ --- 
-        // await updateParticipantProgress(
-        //   participant.userId,
-        //   participant.nickname,
-        //   session.trials 
-        // );
-        // --- КОНЕЦ УДАЛЕНИЯ ---
-
-        // Вызов обновления лидерборда отсюда тоже можно убрать, 
-        // т.к. он теперь делается в App.tsx после updateParticipantProgress
-        // try {
-        //   await updateLeaderboard(...);
-        // } catch (error) { ... }
       }
       
       onComplete({
