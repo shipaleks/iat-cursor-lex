@@ -116,6 +116,11 @@ This section describes the key mechanisms for selecting stimuli (images and word
 
 **Result:** The system tries to maximize the novelty of presented real words and image-word pairs, prioritizing less frequently encountered stimuli.
 
+**Улучшения алгоритма (v2.1):** 
+В предыдущей версии при равном счетчике показов система всегда выбирала первое слово из сортированного списка, что приводило к неравномерному распределению. Теперь реализован алгоритм с **случайным выбором** из группы слов с одинаковым (минимальным) счетчиком. Это обеспечивает более равномерное распределение слов и позволяет участнику увидеть все 46 эстетических слов за значительно меньшее количество сессий (3-4 сессии вместо 10+ с предыдущим алгоритмом).
+
+**Результат:** Система максимизирует новизну предъявляемых реальных слов и пар изображение-слово, отдавая предпочтение тем стимулам, которые встречались реже, одновременно поддерживая равномерное распределение всех слов в банке.
+
 #### 4. Non-word Generation (`generateNonWord`)
 
 **Goal:** To create a phonotactically plausible but non-existent Russian word, resembling an adverb (typically ending in -но/-во), while avoiding the generation of actual existing words (from the `AESTHETIC_WORDS` and `EXTERNAL_SIMILAR_ADVERBS` lists) and the specific word that *would* have been shown if it were a real-word trial (`baseWordForMutation`).
@@ -136,7 +141,7 @@ This section describes the key mechanisms for selecting stimuli (images and word
     *   It is not a real word (checked against the combined Set of `AESTHETIC_WORDS` and `EXTERNAL_SIMILAR_ADVERBS`).
     *   It passes the `isPhonotacticallyPlausible` check:
         *   No more than 3 consecutive consonants or 3 consecutive vowels.
-        *   Does not contain forbidden letter clusters from the `FORBIDDEN_CLUSTERS` list (e.g., 'чч', 'шш', 'гт', 'бьн', 'ийе', 'тт', 'сй', 'зй', etc.).
+        *   Does not contain forbidden letter clusters from the `FORBIDDEN_CLUSTERS` list (e.g., 'чч', 'шш', 'гт', 'бьн', 'ийе', 'тт', 'сй', 'зй' и др.).
         *   Does not start with 3 consonants.
         *   If it starts with 2 consonants, the cluster must be in the `ALLOWED_INITIAL_CONSONANT_CLUSTERS` list.
         *   Does not start with 'ь', 'ъ', 'ц', 'щ'.
@@ -253,12 +258,17 @@ This section describes the key mechanisms for selecting stimuli (images and word
 3.  **Выбор Наименее Показанного:**
     *   Если после фильтрации остались кандидаты:
         *   Находятся слова с **минимальным** счетчиком показов (`totalShownCount`) в `wordStatsCache`.
-        *   Из этой группы наименее показанных слов выбирается одно случайным образом.
+        *   Из этой группы наименее показанных слов выбирается одно **случайным образом** (улучшение v2.1).
 4.  **Резервные Варианты (Fallbacks):**
-    *   *Fallback 1:* Если после фильтрации не осталось кандидатов (все подходящие слова уже были показаны с этим изображением или в этой сессии), выбирается наименее показанное слово (по `wordStatsCache`) из тех, которых **не было** в `shownWordsInSession` (игнорируя историю пар с этим изображением).
-    *   *Fallback 2:* Если даже таких слов нет (все реальные слова уже были показаны в этой сессии), выбирается абсолютно случайное реальное слово из всего списка `AESTHETIC_WORDS`.
+    *   *Fallback 1:* Если после фильтрации не осталось кандидатов (все подходящие слова уже были показаны с этим изображением или в этой сессии), выбирается случайное слово из группы наименее показанных слов (по `wordStatsCache`) из тех, которых **не было** в `shownWordsInSession` (игнорируя историю пар с этим изображением).
+    *   *Fallback 2:* Если даже таких слов нет (все реальные слова уже были показаны в этой сессии), выбирается случайное слово из группы наименее показанных слов из всего списка `AESTHETIC_WORDS`.
 
-**Результат:** Система старается максимизировать новизну предъявляемых реальных слов и пар изображение-слово, отдавая предпочтение тем стимулам, которые встречались реже.
+**Результат:** The system tries to maximize the novelty of presented real words and image-word pairs, prioritizing less frequently encountered stimuli.
+
+**Улучшения алгоритма (v2.1):** 
+В предыдущей версии при равном счетчике показов система всегда выбирала первое слово из сортированного списка, что приводило к неравномерному распределению. Теперь реализован алгоритм с **случайным выбором** из группы слов с одинаковым (минимальным) счетчиком. Это обеспечивает более равномерное распределение слов и позволяет участнику увидеть все 46 эстетических слов за значительно меньшее количество сессий (3-4 сессии вместо 10+ с предыдущим алгоритмом).
+
+**Результат:** Система максимизирует новизну предъявляемых реальных слов и пар изображение-слово, отдавая предпочтение тем стимулам, которые встречались реже, одновременно поддерживая равномерное распределение всех слов в банке.
 
 #### 4. Генерация Не-слов (`generateNonWord`)
 
