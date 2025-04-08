@@ -369,6 +369,10 @@ export const updateLeaderboard = async (
         totalTrials: totalTrials,
         correctTrials: correctTrials
       };
+      // Дополнительная проверка перед записью
+      if (!participantId) {
+          console.error(`[Leaderboard Update] !!! CRITICAL: Attempting to write initial entry for ${safeNickname} WITHOUT participantId!`, leaderboardEntry);
+      }
       console.log(`[Leaderboard Update] Attempting to setDoc for initial entry: ${safeNickname}`, leaderboardEntry); // Лог перед записью
       try {
         // Используем setDoc вместо updateDoc для гарантированного создания или обновления
@@ -444,7 +448,7 @@ export const updateLeaderboard = async (
       ratingDetails: averageRating, // Сохраняем весь объект среднего рейтинга
       lastUpdated: serverTimestamp(),
       // Сохраняем общую статистику по испытаниям (может быть полезно)
-      totalTrials: totalTrialsAllSessions, 
+      totalTrials: totalTrialsAllSessions,
       correctTrials: totalCorrectTrialsAllSessions,
       trialStats: { // Детализация по типам слов (суммарная)
         realWordTrials,
@@ -453,6 +457,10 @@ export const updateLeaderboard = async (
         correctNonWordTrials
       }
     };
+    // Дополнительная проверка перед записью
+    if (!participantId) {
+        console.error(`[Leaderboard Update] !!! CRITICAL: Attempting to write average entry for ${safeNickname} WITHOUT participantId!`, leaderboardData);
+    }
     console.log('[Leaderboard Update] Data to save:', leaderboardData);
     console.log(`[Leaderboard Update] Attempting to setDoc for average entry: ${safeNickname}`, leaderboardData); // Лог перед записью
     try {
@@ -638,22 +646,47 @@ export const getLeaderboard = async (): Promise<LeaderboardEntryType[]> => {
 
 // Функция для пересчета рейтинга всех участников
 export const recalculateLeaderboardScores = async () => {
+  console.log('[Recalculate] Starting recalculation process...');
   try {
     const leaderboardSnapshot = await getDocs(collection(db, 'leaderboard'));
+    console.log(`[Recalculate] Found ${leaderboardSnapshot.size} total entries in leaderboard.`);
 
-    for (const docRef of leaderboardSnapshot.docs) {
-      const data = docRef.data();
-      
-      // Получаем сессии пользователя
+    let processedCount = 0;
+    for (const leaderboardDoc of leaderboardSnapshot.docs) {
+      const leaderboardData = leaderboardDoc.data();
+      const docId = leaderboardDoc.id; // ID документа = safeNickname
+      const originalNickname = leaderboardData.nickname; // Отображаемый никнейм
+      const participantId = leaderboardData.participantId; // ID пользователя
+
+      console.log(`[Recalculate] Processing entry ID: ${docId} (Nickname: ${originalNickname}, PID: ${participantId})`);
+
+      // Пропускаем диагностические/отладочные записи
+      if (docId === '_debug_entry_' || docId.startsWith('debug-') || leaderboardData.isErrorEntry) {
+        console.log(`[Recalculate] Skipping diagnostic/debug entry: ${docId}`);
+        continue;
+      }
+
+      // Проверяем, есть ли participantId (важно для запроса сессий)
+      if (!participantId) {
+        console.warn(`[Recalculate] Skipping entry ID ${docId} (Nickname: ${originalNickname}) because participantId is missing.`);
+        continue;
+      }
+
+      // Получаем сессии пользователя по participantId (надежнее, чем по никнейму)
+      console.log(`[Recalculate] Querying sessions for participantId: ${participantId}`);
       const sessionsQuery = query(
         collection(db, 'sessions'),
-        where('nickname', '==', data.nickname)
+        where('participantId', '==', participantId)
       );
       const sessionsSnapshot = await getDocs(sessionsQuery);
       const sessions = sessionsSnapshot.docs.map(doc => doc.data());
+      console.log(`[Recalculate] Found ${sessions.length} sessions for participantId: ${participantId}`);
 
       if (sessions.length === 0) {
-        console.warn(`No sessions found for ${data.nickname}, skipping recalculation`);
+        console.warn(`[Recalculate] No sessions found for participantId ${participantId} (Nickname: ${originalNickname}), skipping recalculation for this entry.`);
+        // Возможно, стоит удалить эту запись из лидерборда, если сессий нет?
+        // await deleteDoc(leaderboardDoc.ref);
+        // console.log(`[Recalculate] Deleted leaderboard entry ${docId} due to no sessions.`);
         continue;
       }
 
@@ -663,44 +696,54 @@ export const recalculateLeaderboardScores = async () => {
       const correctTrials = sessions.reduce((sum, session) => sum + (session.correctTrials || 0), 0);
       const totalTimeMs = sessions.reduce((sum, session) => sum + (session.totalTimeMs || 0), 0);
       const averageTimeMs = totalTimeMs / totalSessions;
+      const lastDeviceType = sessions[sessions.length - 1]?.deviceType || 'desktop'; // Берем тип устройства из последней сессии
 
-      // Получаем прогресс участника для подсчета раундов
-      const existingProgress = await getParticipantProgressByNickname(data.nickname);
-      const completedImages = existingProgress?.progress.completedImages || [];
-      console.log('Recalculating for nickname', data.nickname, 'completed images:', completedImages.length);
-      
-      // НОВАЯ ЛОГИКА: раунд = количество сессий
-      const sessionsCount = existingProgress?.progress.totalSessions || 1;
-      const completedRounds = Math.max(1, sessionsCount);
-      console.log('Recalculated completedRounds based on sessions:', completedRounds);
+      // Получаем прогресс участника для подсчета раундов (по participantId)
+      const existingProgress = await getParticipantProgress(participantId);
+      const completedRounds = Math.max(1, existingProgress?.totalSessions || sessions.length);
+      console.log(`[Recalculate] Calculated rounds for PID ${participantId}: ${completedRounds} (based on ${existingProgress?.totalSessions} from progress or ${sessions.length} sessions)`);
 
       // Рассчитываем рейтинг
+      console.log(`[Recalculate] Calculating rating for PID ${participantId} with: Trials=${totalTrials}, Correct=${correctTrials}, AvgTime=${averageTimeMs}, Rounds=${completedRounds}`);
       const rating = await calculateRating(
         totalTrials,
         correctTrials,
         averageTimeMs,
         completedRounds
+        // Можно добавить статистику по словам, если она есть в сессиях
       );
+      console.log(`[Recalculate] Calculated rating for PID ${participantId}:`, rating);
 
       // Обновляем запись в лидерборде
       if (!isNaN(rating.finalScore)) {
-        await updateDoc(docRef.ref, {
+        const updateData = {
           score: rating.finalScore,
           accuracy: rating.accuracy,
           totalTimeMs: averageTimeMs,
           ratingDetails: rating,
           roundsCompleted: completedRounds,
-          lastUpdated: serverTimestamp()
-        });
-        console.log(`Updated score for ${data.nickname}: ${rating.finalScore}`);
+          lastUpdated: serverTimestamp(),
+          deviceType: lastDeviceType, // Обновляем тип устройства
+          participantId: participantId, // Убедимся, что ID есть
+          nickname: originalNickname // Сохраняем оригинальный никнейм
+        };
+        console.log(`[Recalculate] Attempting to updateDoc for entry ID: ${docId}`, updateData);
+        try {
+          await updateDoc(leaderboardDoc.ref, updateData);
+          console.log(`[Recalculate] Successfully updated score for entry ID ${docId} (Nickname: ${originalNickname}) to ${rating.finalScore}`);
+          processedCount++;
+        } catch (updateError) {
+          console.error(`[Recalculate] !!! FAILED to update entry ID ${docId} (Nickname: ${originalNickname}):`, updateError);
+          console.error(`[Recalculate] Data that failed update:`, updateData);
+        }
       } else {
-        console.warn(`Invalid rating calculated for ${data.nickname}`);
+        console.warn(`[Recalculate] Invalid rating calculated for entry ID ${docId} (Nickname: ${originalNickname}), skipping update.`);
       }
     }
 
-    console.log('Leaderboard scores recalculated successfully.');
+    console.log(`[Recalculate] Leaderboard scores recalculation finished. Processed ${processedCount} valid entries.`);
   } catch (error) {
-    console.error('Error recalculating leaderboard scores:', error);
+    console.error('[Recalculate] Error during recalculation process:', error);
     throw error;
   }
 };
