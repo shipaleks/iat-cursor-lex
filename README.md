@@ -264,13 +264,3 @@ If you prefer other hosting platforms (e.g., Vercel, Netlify, Railway), configur
 3. **Firebase Quota Limits**: Heavy usage might exceed free quotas. For large-scale studies, consider upgrading your Firebase plan.  
 4. **TypeScript Definition Errors**: Keep dependencies (TypeScript, React types) updated, and ensure your `tsconfig.json` is aligned with your library versions.
 
----
-
-## Contacts
-
-If you have any questions, feedback, or suggestions, feel free to:
-
-- Create an [issue on GitHub](https://github.com/username/my-lexical-app/issues).  
-- Reach out to our development team (see `package.json` for contact info).
-
-Thank you for using **Lexical Decision Web App**! We hope it streamlines your experimental workflow. Contributions, pull requests, and feature ideas are always welcome. Enjoy exploring lexical decisions, reaction times, and maybe even adapt it for IAT-inspired tasks!
